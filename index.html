@@ -1,0 +1,2160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>타로 앱</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+/* ── iOS Safari 높이 대응 ── */
+:root { --app-height: 100vh; }
+/* ── 공통 ── */
+*{margin:0;padding:0;box-sizing:border-box;}
+body{margin:0;background:#000;font-family:'Noto Serif KR',serif;overflow:hidden;height:100dvh;height:var(--app-height);}
+.app{width:100vw;height:100dvh;height:var(--app-height);position:relative;overflow:hidden;}
+.screen{position:absolute;top:0;left:0;right:0;bottom:0;display:none;flex-direction:column;}
+.screen.active{display:flex;}
+.bg{position:absolute;top:0;left:0;right:0;bottom:0;width:100%;height:100%;object-fit:cover;pointer-events:none;z-index:0;}
+.content{position:relative;z-index:2;flex:1;}
+/* iOS Safari 클릭 이벤트 대응 */
+button, [onclick] { cursor:pointer; touch-action:manipulation; }
+
+/* ── 하단 네비 ── */
+.bg-nav-container{position:absolute;left:0;width:100%;z-index:10;display:flex;align-items:center;}
+.bg-nav-item{flex:1;height:100%;cursor:pointer;background:transparent;pointer-events:all;-webkit-tap-highlight-color:transparent;}
+.bg-nav-item:active{opacity:0.6;}
+.nav-home{bottom:12%;height:14%;}
+.nav-consult{bottom:0%;height:10%;}
+
+/* ── 홈 ── */
+.home-start-btn{position:absolute;top:28%;left:50%;transform:translateX(-50%);width:65%;height:38%;z-index:10;background:transparent;border:none;cursor:pointer;-webkit-tap-highlight-color:transparent;border-radius:50%;}
+
+/* ── 고민상담 ── */
+.consult-menu-overlay{position:absolute;top:28%;left:50%;transform:translateX(-50%);width:88%;height:58%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);gap:2.5% 3%;z-index:10;}
+.consult-btn-area{width:100%;height:100%;background:transparent;cursor:pointer;border:none;outline:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation;pointer-events:all;}
+
+/* ── 카드선택 ── */
+#card-select .content{display:flex;flex-direction:column;height:100%;padding-top:43%;box-sizing:border-box;}
+.card-header{display:none;}
+.cards-grid{display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(3,1fr);gap:4px;padding:0 12px;flex-shrink:0;height:42vh;}
+.card{width:100%;height:100%;perspective:800px;overflow:hidden;}
+.card-inner{width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform 0.6s;}
+.card.flipped .card-inner{transform:rotateY(180deg);}
+.card-face{position:absolute;top:0;left:0;right:0;bottom:0;border-radius:4px;backface-visibility:hidden;-webkit-backface-visibility:hidden;}
+.card-back{background-image:url("https://i.imgur.com/HiZIXwY.png");background-size:cover;border:1px solid rgba(191,95,255,0.3);}
+.card-front{transform:rotateY(180deg);background:#0d0620;border:2px solid #bf5fff;}
+.card-front img{width:100%;height:100%;object-fit:cover;border-radius:3px;}
+.result-btn-wrap{padding:20px 0 0;display:flex;justify-content:center;flex-shrink:0;}
+.result-btn{background:rgba(191,95,255,0.3);border:1px solid #bf5fff;color:white;padding:10px 36px;border-radius:30px;cursor:pointer;font-family:'Noto Serif KR',serif;font-size:15px;}
+
+/* ── 결과 ── */
+#result-screen .content{padding-top:43%;display:flex;flex-direction:column;align-items:center;height:100%;overflow-y:auto;}
+.result-title{display:none;}
+.result-cards-row{display:flex;gap:8px;justify-content:center;padding:0 20px;margin-bottom:10px;flex-shrink:0;width:100%;}
+.result-card-item{flex:1;max-width:28%;display:flex;flex-direction:column;align-items:center;gap:4px;}
+.result-card-img{width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:5px;border:2px solid #bf5fff;box-shadow:0 0 10px rgba(191,95,255,0.4);}
+.result-card-name{color:#e8c0ff;font-size:10px;text-align:center;}
+.result-reading-box{margin:0 20px 10px;background:rgba(13,6,32,0.75);border:1px solid rgba(191,95,255,0.4);border-radius:12px;padding:14px;color:#e8d0ff;font-size:12px;line-height:1.8;min-height:70px;width:calc(100% - 40px);flex-shrink:0;}
+.loading-text{color:#bf5fff;text-align:center;font-size:12px;animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+.result-back-btn{display:block;margin:0 auto 12px;background:rgba(191,95,255,0.3);border:1px solid #bf5fff;color:white;padding:9px 30px;border-radius:30px;cursor:pointer;font-family:'Noto Serif KR',serif;font-size:13px;flex-shrink:0;}
+
+/* ── 빛의 타로 변수 ── */
+:root{--gold:#d4af37;--gold-bright:#ffea7a;--gold-dim:#8a6f1a;}
+
+/* ── 질문타로 첫 화면 교체 ── */
+#qt-main{
+  width:100%;height:100%;max-width:430px;margin:0 auto;position:relative;overflow:hidden;
+  -webkit-overflow-scrolling:touch;
+  background:url('https://i.imgur.com/tyRWfVX.jpeg') no-repeat center center;background-size:cover;
+}
+#qt-sparkle-canvas{
+  position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:95;
+}
+#qt-butterfly{
+  position:absolute;top:45px;left:50%;font-size:32px;z-index:100;
+  transform:translate(-50%,-50%);pointer-events:none;filter:drop-shadow(0 0 10px gold);
+  will-change:transform,top,left;
+}
+#qt-bf-inner{display:inline-block;}
+#qt-bf-inner.flapping{animation:qtFlap 0.12s infinite alternate ease-in-out;}
+@keyframes qtFlap{from{transform:scaleX(1.3);}to{transform:scaleX(0.3);}}
+#qt-flower-grid{
+  position:absolute;top:12.5%;left:0;width:100%;height:36%;padding:0 15px;display:grid;
+  grid-template-columns:repeat(4,1fr);row-gap:15px;z-index:80;
+}
+.qt-flower-trigger{
+  width:100%;height:80px;cursor:pointer;-webkit-tap-highlight-color:transparent;
+  background:transparent;border:none;outline:none;
+}
+.qt-flower-trigger.selected{filter:brightness(1.08) drop-shadow(0 0 6px rgba(255,255,255,0.35));}
+#qt-wick-point{position:absolute;top:60.1%;left:50%;transform:translateX(-50%);width:2px;height:2px;z-index:60;}
+#qt-flame{
+  position:absolute;bottom:-2px;left:50%;transform:translateX(-50%) scale(0);
+  width:25px;height:85px;border-radius:50% 50% 35% 35% / 80% 80% 20% 20%;
+  opacity:0;filter:blur(1.5px);z-index:60;
+}
+#qt-flame.show{
+  opacity:1;transform:translateX(-50%) scale(1);
+  transition:transform 1.2s cubic-bezier(0.175,0.885,0.32,1.275),opacity 0.8s;
+  animation:qtFlicker 0.5s infinite alternate ease-in-out;
+}
+@keyframes qtFlicker{0%{transform:translateX(-50%) scale(1);}100%{transform:translateX(-50%) scale(1.1,1.08);}}
+#qt-ask-btn{
+  position:absolute;bottom:8%;left:50%;transform:translateX(-50%);
+  width:140px;height:140px;border-radius:50%;z-index:90;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;background:transparent;border:none;outline:none;
+}
+.qt-guide-text{
+  position:absolute;bottom:20px;width:100%;text-align:center;font-size:14px;
+  letter-spacing:-0.2px;color:rgba(255,235,210,0.8);
+  text-shadow:0 0 10px rgba(0,0,0,0.9);z-index:110;pointer-events:none;
+  animation:qtGuideBlink 2.5s infinite ease-in-out;
+}
+@keyframes qtGuideBlink{0%,100%{opacity:0.4;}50%{opacity:1;}}
+@media(max-height:700px){
+  #qt-ask-btn{width:120px;height:120px;}
+}
+
+/* ── 빛의 타로 모달/레이어 ── */
+.qt-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:5000;display:none;justify-content:center;align-items:center;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);}
+.qt-box{background:#0e0b07;border:1.5px solid var(--gold);border-radius:20px;padding:24px;width:90%;max-width:360px;text-align:center;color:#fff;position:relative;padding-top:50px;}
+.qt-candle{position:absolute;top:15px;font-size:24px;filter:drop-shadow(0 0 8px #ffaa00);}
+.qt-input{width:100%;height:100px;background:#050300;border:1px solid var(--gold-dim);color:#eee;padding:12px 46px 12px 12px;border-radius:10px;margin:15px 0 6px;outline:none;font-size:15px;resize:none;font-family:'Noto Serif KR',serif;}
+.qt-gold-btn{background:linear-gradient(135deg,#c9a227,#e8cc5a,#c9a227);color:#0a0700;border:none;padding:14px 0;width:100%;border-radius:25px;font-weight:bold;cursor:pointer;font-size:15px;font-family:'Noto Serif KR',serif;animation:qt-blink 1.5s infinite ease-in-out;}
+@keyframes qt-blink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.82;transform:scale(0.97);filter:brightness(1.25)}}
+@keyframes qt-typing-dot{0%,80%,100%{transform:scale(0.7);opacity:0.4}40%{transform:scale(1);opacity:1}}
+/* qt-mic-btn 제거됨 */
+/* 모든 버튼 클릭바 제거 */
+button{-webkit-tap-highlight-color:transparent;}
+
+/* ── 빛의 타로 카드 픽 ── */
+#qt-pick-layer{position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at center,#0d0a06 0%,#000 100%);z-index:4500;display:none;flex-direction:column;align-items:center;justify-content:space-between;padding:16px 0;}
+#qt-card-slots{display:flex;gap:12px;margin-top:8px;}
+.qt-slot{width:72px;height:112px;border:1px solid #2a2010;border-radius:8px;background:rgba(255,255,255,0.02);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;overflow:hidden;transition:0.4s;}
+.qt-slot.active{border:2px solid var(--gold);box-shadow:0 0 20px rgba(212,175,55,0.4);}
+.qt-table-wrap{flex:1;width:100vw;max-width:500px;display:flex;align-items:center;justify-content:center;}
+.qt-svg{width:100%;height:100%;overflow:visible;}
+.card-group{cursor:pointer;transition:transform 0.8s cubic-bezier(0.4,0,0.2,1),filter 0.3s;}
+.card-body{fill:#1a1208;stroke:rgba(210,190,140,0.8);stroke-width:1.2;transition:fill 0.4s,filter 0.4s;}
+.card-inner-line{fill:none;stroke:rgba(210,190,140,0.4);stroke-width:0.7;}
+.card-diamond{fill:none;stroke:rgba(210,190,140,0.55);stroke-width:0.8;}
+.card-group.picked .card-body{fill:#fff!important;stroke:#fff;filter:drop-shadow(0 0 14px #fff) brightness(1.8);}
+.card-group.picked .card-inner-line,.card-group.picked .card-diamond{opacity:0;}
+#qt-pick-footer{width:100%;display:flex;justify-content:center;gap:12px;padding:0 20px 8px;}
+.qt-btn-sec{width:44%;background:rgba(255,255,255,0.05);color:var(--gold);border:1.5px solid var(--gold-dim);padding:13px 0;border-radius:25px;font-size:14px;font-family:'Noto Serif KR',serif;cursor:pointer;}
+.qt-btn-pri{width:44%;background:linear-gradient(135deg,#c9a227,#e8cc5a,#c9a227);color:#0a0700;border:none;padding:13px 0;border-radius:25px;font-size:14px;font-family:'Noto Serif KR',serif;font-weight:bold;cursor:pointer;}
+
+/* ── 오늘의 운세 카테고리 레이블 ── */
+.df-cat-label{color:#d4b0ff;font-size:14px;font-family:'Noto Serif KR',serif;cursor:pointer;-webkit-tap-highlight-color:transparent;text-shadow:0 0 12px rgba(180,80,255,0.9),0 0 4px rgba(180,80,255,0.6);letter-spacing:1px;user-select:none;z-index:5;position:absolute;transition:all 0.2s;}
+.df-cat-label.selected{color:#fff;text-shadow:0 0 18px rgba(220,160,255,1),0 0 8px rgba(200,100,255,0.9);transform:scale(1.15);}
+.df-invisible{color:transparent !important;text-shadow:none !important;background:transparent;display:block;}
+/* 카드 선택용 미니 카드 */
+.df-mini-card{width:72px;height:110px;border:2px solid rgba(160,80,255,0.6);border-radius:8px;overflow:hidden;cursor:pointer;transition:all 0.3s;background:#0d0020;-webkit-tap-highlight-color:transparent;flex-shrink:0;}
+.df-mini-card img{width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 0.4s;}
+.df-mini-card.selected{border-color:#d090ff;box-shadow:0 0 20px rgba(180,80,255,0.9);transform:translateY(-8px) scale(1.05);}
+.df-reset-btn{background:rgba(191,95,255,0.2);border:1px solid rgba(191,95,255,0.5);color:#e8c0ff;padding:11px 0;border-radius:30px;cursor:pointer;font-family:'Noto Serif KR',serif;font-size:13px;-webkit-tap-highlight-color:transparent;}
+/* 결과화면: 스크롤 영역 + 하단 버튼 고정 */
+#qt-result{position:fixed;top:0;left:0;right:0;bottom:0;background:#060401;z-index:4000;display:none;flex-direction:column;-webkit-overflow-scrolling:touch;}
+#qt-result-scroll{flex:1;overflow-y:auto;padding:30px 20px 20px;display:flex;flex-direction:column;align-items:center;}
+#qt-result-btns{flex-shrink:0;display:flex;gap:10px;padding:12px 20px 24px;background:#060401;}
+.qt-res-cards{display:flex;gap:10px;margin-bottom:24px;justify-content:center;}
+.qt-res-card-wrap{text-align:center;width:80px;}
+.qt-res-card-img{width:80px;height:130px;border:2px solid var(--gold);background:#3d2b1f;margin:0 auto;display:flex;align-items:center;justify-content:center;border-radius:6px;box-shadow:0 0 20px rgba(212,175,55,0.25);overflow:hidden;}
+.qt-res-card-name{font-size:10px;color:var(--gold-bright);margin-top:6px;font-weight:bold;line-height:1.4;}
+.qt-section{width:100%;max-width:420px;background:rgba(255,255,255,0.03);border:1px solid #2a1f0d;border-radius:12px;padding:18px;margin-bottom:14px;}
+.qt-sec-h{color:var(--gold);font-weight:bold;margin-bottom:8px;font-size:13px;border-bottom:1px solid #332612;padding-bottom:6px;letter-spacing:1px;}
+.qt-sec-b{color:#d8d0c8;font-size:13px;line-height:1.9;white-space:pre-wrap;font-family:'Noto Serif KR',serif;}
+.qt-loading-orb{width:48px;height:48px;border-radius:50%;background:radial-gradient(circle,rgba(212,175,55,0.4) 0%,transparent 70%);box-shadow:0 0 30px rgba(212,175,55,0.3);animation:qt-orb 1.5s ease-in-out infinite;margin:0 auto 12px;}
+@keyframes qt-orb{0%,100%{transform:scale(1);opacity:0.6}50%{transform:scale(1.2);opacity:1}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 홈 -->
+  <div class="screen active" id="home">
+    <img class="bg" src="https://i.imgur.com/vBroNeQ.png" alt="">
+    <div class="content">
+      <button class="home-start-btn" onclick="playDrop(); go('consult-menu')"></button>
+    </div>
+    <!-- 홈 음표 버튼 -->
+    <button id="home-music-btn" onclick="qtToggleMusic()" style="position:absolute;top:14px;right:14px;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,0.55);border:1.5px solid rgba(180,140,60,0.7);color:#ffea7a;font-size:18px;cursor:pointer;z-index:200;display:flex;align-items:center;justify-content:center;pointer-events:all;-webkit-tap-highlight-color:transparent;">🎵</button>
+    <!-- 나만의 공간 - 홈 배경 이미지 오른쪽 "니만의 공간" 위치 -->
+    <button onclick="openMySpace()" style="position:absolute;right:3%;top:65%;width:24%;height:12%;background:transparent;border:none;cursor:pointer;z-index:150;-webkit-tap-highlight-color:transparent;pointer-events:all;"></button>
+    <div class="bg-nav-container nav-home">
+      <div class="bg-nav-item" onclick="playDrop(); go('home')"></div>
+      <div class="bg-nav-item" onclick="playDrop(); go('consult-menu')"></div>
+      <div class="bg-nav-item" onclick="playDrop(); goQtScreen()"></div>
+      <div class="bg-nav-item" onclick="playDrop(); dfOpen()"></div>
+    </div>
+  </div>
+
+  <!-- 고민상담 -->
+  <div class="screen" id="consult-menu">
+    <img class="bg" src="https://i.imgur.com/8KKe3Cg.png" alt="">
+    <div class="consult-menu-overlay">
+      <button class="consult-btn-area" onclick="startTarot('연애 고민')"></button>
+      <button class="consult-btn-area" onclick="startTarot('학교/진로 고민')"></button>
+      <button class="consult-btn-area" onclick="startTarot('인간관계 고민')"></button>
+      <button class="consult-btn-area" onclick="startTarot('미래 고민')"></button>
+      <button class="consult-btn-area" onclick="startTarot('재물 고민')"></button>
+      <button class="consult-btn-area" onclick="startTarot('기타 고민')"></button>
+    </div>
+    <div class="bg-nav-container nav-consult">
+      <div class="bg-nav-item" onclick="playDrop(); go('home')"></div>
+      <div class="bg-nav-item" onclick="playDrop(); go('consult-menu')"></div>
+      <div class="bg-nav-item" onclick="playDrop(); goQtScreen()"></div>
+      <div class="bg-nav-item" onclick="playDrop(); dfOpen()"></div>
+    </div>
+  </div>
+
+  <!-- 고민상담 카드선택 -->
+  <div class="screen" id="card-select">
+    <img class="bg" src="https://i.imgur.com/HiZIXwY.png" alt="">
+    <div class="content">
+      <div class="card-header" id="selection-title"></div>
+      <div class="cards-grid" id="cards-grid"></div>
+      <div class="result-btn-wrap">
+        <button class="result-btn" onclick="goResult()">결과 보기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 고민상담 결과 -->
+  <div class="screen" id="result-screen">
+    <img class="bg" src="https://i.imgur.com/HiZIXwY.png" alt="">
+    <div class="content">
+      <div class="result-title" id="result-title"></div>
+      <div class="result-cards-row" id="result-cards-row"></div>
+      <div class="result-reading-box" id="result-reading-box">
+        <span class="loading-text">카드를 읽고 있습니다...</span>
+      </div>
+      <button class="result-back-btn" onclick="go('consult-menu')">다시 보기</button>
+    </div>
+    <div class="bg-nav-container" style="bottom:0;height:18%;background:transparent;">
+      <div class="bg-nav-item" onclick="playDrop(); go('home')"></div>
+      <div class="bg-nav-item" onclick="playDrop(); go('consult-menu')"></div>
+      <div class="bg-nav-item" onclick="playDrop(); goQtScreen()"></div>
+      <div class="bg-nav-item" onclick="playDrop(); dfOpen()"></div>
+    </div>
+  </div>
+
+  <!-- 질문타로 첫 화면 교체 -->
+  <div class="screen" id="question-tarot">
+    <div id="qt-main">
+      <canvas id="qt-sparkle-canvas"></canvas>
+      <div id="qt-butterfly"><span id="qt-bf-inner">🦋</span></div>
+
+      <div id="qt-flower-grid">
+        <button class="qt-flower-trigger" onclick="qtButterflySelect(event,'연애운','#ff4d6d','255,77,109')"></button>
+        <button class="qt-flower-trigger" onclick="qtButterflySelect(event,'이사운','#4d94ff','77,148,255')"></button>
+        <button class="qt-flower-trigger" onclick="qtButterflySelect(event,'사업운','#c56cf0','197,108,240')"></button>
+        <button class="qt-flower-trigger" onclick="qtButterflySelect(event,'재물운','#ff9f43','255,159,67')"></button>
+        <button class="qt-flower-trigger" onclick="qtButterflySelect(event,'합격운','#ffd32a','255,211,42')"></button>
+        <button class="qt-flower-trigger" onclick="qtButterflySelect(event,'건강운','#32ff7e','50,255,126')"></button>
+        <button class="qt-flower-trigger" onclick="qtButterflySelect(event,'대인관계','#ff9ff3','255,159,243')"></button>
+        <button class="qt-flower-trigger" onclick="qtButterflySelect(event,'오늘의운세','#ffb142','255,177,66')"></button>
+      </div>
+
+      <div id="qt-wick-point"><div id="qt-flame"></div></div>
+      
+      <!-- 질문타로 홈 버튼 -->
+      <button
+        id="qt-home-btn"
+        onclick="playDrop(); go('home')"
+        style="
+          position:absolute;
+          bottom:11%;
+          left:18px;
+          width:52px;
+          height:52px;
+          border-radius:50%;
+          border:1.5px solid rgba(255,230,160,0.7);
+          background:rgba(0,0,0,0.45);
+          color:#ffea7a;
+          font-size:24px;
+          z-index:120;
+          cursor:pointer;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          box-shadow:0 0 14px rgba(255,220,120,0.35);
+          -webkit-tap-highlight-color:transparent;
+        "
+      >🏠</button>
+
+<button id="qt-ask-btn" onclick="qtOpenAsk()"></button>
+      <div class="qt-guide-text">꽃잎을 선택해 불을 밝히고 질문하기를 누르세요</div>
+    </div>
+  </div>
+  <div class="screen" id="daily-fortune">
+    <img class="bg" src="https://i.imgur.com/tyRWfVX.jpeg">
+    <div class="bg-nav-container nav-home">
+      <div class="bg-nav-item" onclick="playDrop(); go('home')"></div>
+      <div class="bg-nav-item" onclick="playDrop(); go('consult-menu')"></div>
+      <div class="bg-nav-item" onclick="playDrop(); goQtScreen()"></div>
+      <div class="bg-nav-item" onclick="playDrop(); dfOpen()"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 오늘의 운세 전체화면 -->
+<div id="df-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#000;z-index:2000;flex-direction:column;align-items:stretch;">
+
+  <!-- 나비 캔버스 -->
+  <canvas id="df-bfly-canvas" style="position:absolute;top:0;left:0;right:0;bottom:0;width:100%;height:100%;pointer-events:none;z-index:5;"></canvas>
+
+  <!-- 홈 버튼: 항상 위에 고정 -->
+  <button onclick="dfClose()" style="position:fixed;top:14px;left:14px;z-index:30;width:40px;height:40px;border-radius:50%;background:rgba(80,0,160,0.7);border:1.5px solid rgba(160,80,255,0.8);color:#d4b0ff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;touch-action:manipulation;">🏠</button>
+
+  <!-- 전체 스크롤 래퍼 -->
+  <div id="df-scroll-wrap" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;align-items:center;padding-bottom:30px;">
+
+    <!-- 제목 -->
+    <div style="text-align:center;padding-top:16px;flex-shrink:0;z-index:10;position:relative;width:100%;pointer-events:none;">
+      <div style="color:#c9b6ff;font-size:21px;letter-spacing:4px;font-family:'Noto Serif KR',serif;text-shadow:0 0 20px rgba(191,95,255,0.8);">오늘의 운세</div>
+      <div style="color:#7a5fa0;font-size:11px;letter-spacing:2px;margin-top:3px;">행복한 하루</div>
+    </div>
+
+    <!-- 마크 영역 -->
+    <div id="df-mark-box" style="position:relative;width:85%;max-width:400px;aspect-ratio:1;flex-shrink:0;margin-top:-10px;">
+      <img src="https://i.imgur.com/5qiDGRl.jpeg" style="width:100%;height:100%;object-fit:cover;pointer-events:none;display:block;">
+
+      <span class="df-cat-label df-invisible" onclick="dfSelectCat(this,'친구')" style="position:absolute;top:2%;left:38%;width:24%;height:18%;z-index:5;"></span>
+      <span class="df-cat-label df-invisible" onclick="dfSelectCat(this,'시험')" style="position:absolute;top:13%;right:11%;width:22%;height:18%;z-index:5;"></span>
+      <span class="df-cat-label df-invisible" onclick="dfSelectCat(this,'면접')" style="position:absolute;top:41%;right:2%;width:22%;height:18%;z-index:5;"></span>
+      <span class="df-cat-label df-invisible" onclick="dfSelectCat(this,'건강')" style="position:absolute;bottom:13%;right:11%;width:22%;height:18%;z-index:5;"></span>
+      <span class="df-cat-label df-invisible" onclick="dfSelectCat(this,'합격')" style="position:absolute;bottom:2%;left:38%;width:24%;height:18%;z-index:5;"></span>
+      <span class="df-cat-label df-invisible" onclick="dfSelectCat(this,'금전')" style="position:absolute;bottom:13%;left:11%;width:22%;height:18%;z-index:5;"></span>
+      <span class="df-cat-label df-invisible" onclick="dfSelectCat(this,'이동')" style="position:absolute;top:41%;left:2%;width:22%;height:18%;z-index:5;"></span>
+      <span class="df-cat-label df-invisible" onclick="dfSelectCat(this,'연애')" style="position:absolute;top:13%;left:11%;width:22%;height:18%;z-index:5;"></span>
+
+      <!-- 원 안 텍스트 -->
+      <div id="df-circle-text" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:40%;text-align:center;color:#e0d0ff;font-size:14px;font-weight:bold;line-height:1.3;font-family:'Noto Serif KR',serif;pointer-events:none;z-index:10;text-shadow:0 0 10px rgba(180,80,255,1);">카테고리를<br>선택하세요</div>
+    </div>
+
+    <!-- 카드뽑기 버튼 -->
+    <button id="df-draw-btn" onclick="dfDrawCards()" style="flex-shrink:0;margin-top:10px;width:55%;max-width:220px;background:linear-gradient(135deg,#3a0a6a,#8b30d4,#3a0a6a);color:#e8c0ff;border:1.5px solid rgba(191,95,255,0.6);padding:10px 0;border-radius:30px;font-weight:bold;cursor:pointer;font-size:14px;font-family:'Noto Serif KR',serif;box-shadow:0 0 16px rgba(120,0,200,0.4);-webkit-tap-highlight-color:transparent;touch-action:manipulation;">&#x1F52E; 카드 1장 뽑기</button>
+
+    <!-- 카드 3장 (버튼 바로 아래) -->
+    <div id="df-cards-row" style="display:none;flex-direction:row;gap:12px;justify-content:center;width:100%;padding:10px 0;flex-shrink:0;"></div>
+
+    <!-- 최신 결과 1개만 표시 -->
+    <div id="df-latest-result" style="width:92%;max-width:400px;flex-shrink:0;"></div>
+
+    <!-- 종합운세 보기 버튼 -->
+    <button id="df-summary-btn" onclick="dfOpenSummary()" style="display:none;flex-shrink:0;margin-top:6px;width:55%;max-width:220px;background:rgba(80,0,160,0.35);color:#d4b0ff;border:1.5px solid rgba(160,80,255,0.6);padding:9px 0;border-radius:30px;font-size:12px;font-family:'Noto Serif KR',serif;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;">&#x2728; 종합운세 보기</button>
+
+  </div>
+</div>
+
+<!-- 종합운세 팝업 -->
+<div id="df-summary-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.92);z-index:9000;justify-content:center;align-items:center;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);">
+  <div style="background:#0d0020;border:1.5px solid rgba(160,80,255,0.7);border-radius:20px;width:90%;max-width:380px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;">
+    <div style="padding:16px 20px 10px;text-align:center;border-bottom:1px solid rgba(160,80,255,0.3);flex-shrink:0;">
+      <div style="color:#c9b6ff;font-size:17px;letter-spacing:3px;font-family:'Noto Serif KR',serif;text-shadow:0 0 16px rgba(191,95,255,0.8);">&#x2728; 종합운세 기록</div>
+      <div style="color:#7a5fa0;font-size:10px;margin-top:3px;">오늘 뽑은 카드 모아보기</div>
+    </div>
+    <div id="df-summary-list" style="flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch;"></div>
+    <div style="padding:12px 16px 18px;flex-shrink:0;text-align:center;">
+      <button onclick="dfCloseSummary()" style="background:rgba(191,95,255,0.3);border:1px solid rgba(191,95,255,0.6);color:#e8c0ff;padding:10px 36px;border-radius:30px;font-size:13px;font-family:'Noto Serif KR',serif;cursor:pointer;-webkit-tap-highlight-color:transparent;">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 빛의 타로: 질문 모달 -->
+<!-- 채팅형 상담 모달 -->
+<div id="qt-ask-modal" class="qt-overlay" style="align-items:flex-end;padding:0;">
+  <div id="qt-chat-box" style="
+    background:#0a0800;
+    border:1.5px solid var(--gold);
+    border-bottom:none;
+    border-radius:24px 24px 0 0;
+    width:100%;
+    max-width:480px;
+    height:88vh;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    position:relative;
+  ">
+    <!-- 헤더 -->
+    <div style="
+      flex-shrink:0;
+      padding:14px 20px 12px;
+      border-bottom:1px solid rgba(180,140,60,0.25);
+      display:flex;
+      align-items:center;
+      gap:10px;
+      background:#0a0800;
+    ">
+      <span style="font-size:22px;filter:drop-shadow(0 0 8px #ffaa00);">🕯️</span>
+      <div style="flex:1;">
+        <div style="color:var(--gold);font-size:15px;font-family:'Noto Serif KR',serif;letter-spacing:1px;">타로 상담</div>
+        <div id="qt-chat-luck-label" style="color:#9a7830;font-size:11px;margin-top:1px;"></div>
+      </div>
+      <button onclick="qtCloseChat()" style="
+        background:none;border:none;color:#666;font-size:22px;
+        cursor:pointer;padding:4px 8px;-webkit-tap-highlight-color:transparent;
+      ">✕</button>
+    </div>
+
+    <!-- 메시지 목록 -->
+    <div id="qt-chat-messages" style="
+      flex:1;
+      overflow-y:auto;
+      padding:16px 14px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      -webkit-overflow-scrolling:touch;
+    "></div>
+
+    <!-- 타로 뽑기 버튼 (충분히 대화 후 노출) -->
+    <div id="qt-draw-trigger" style="
+      display:none;
+      flex-shrink:0;
+      padding:8px 14px 0;
+    ">
+      <button onclick="qtStartTarot()" style="
+        width:100%;
+        background:linear-gradient(135deg,#c9a227,#e8cc5a,#c9a227);
+        color:#0a0700;border:none;padding:13px 0;
+        border-radius:25px;font-weight:bold;cursor:pointer;
+        font-size:14px;font-family:'Noto Serif KR',serif;
+        animation:qt-blink 1.5s infinite ease-in-out;
+        -webkit-tap-highlight-color:transparent;
+      ">✦ 타로카드 3장을 뽑아 주세요 ✦</button>
+    </div>
+
+    <!-- 입력창 -->
+    <div style="
+      flex-shrink:0;
+      display:flex;
+      gap:8px;
+      align-items:flex-end;
+      padding:10px 14px 20px;
+      background:#0a0800;
+    ">
+      <textarea id="qt-q-input" placeholder="마음속 이야기를 써주세요..." style="
+        flex:1;min-height:40px;max-height:100px;
+        background:#18120a;border:1px solid rgba(180,140,60,0.4);
+        color:#eee;padding:10px 14px;border-radius:20px;
+        outline:none;font-size:14px;resize:none;
+        font-family:'Noto Serif KR',serif;line-height:1.5;
+        -webkit-appearance:none;
+      " oninput="this.style.height='40px';this.style.height=Math.min(this.scrollHeight,100)+'px'"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();qtChatSend();}"></textarea>
+      <button onclick="qtChatSend()" style="
+        flex-shrink:0;width:40px;height:40px;border-radius:50%;
+        background:linear-gradient(135deg,#c9a227,#e8cc5a);
+        border:none;font-size:18px;cursor:pointer;
+        display:flex;align-items:center;justify-content:center;
+        -webkit-tap-highlight-color:transparent;
+      ">➤</button>
+    </div>
+  </div>
+</div>
+<!-- qt-luck-label 호환용 (숨김) -->
+<p id="qt-luck-label" style="display:none;"></p>
+
+<!-- 빛의 타로: 카드 픽 -->
+<div id="qt-pick-layer">
+  <div id="qt-card-slots">
+    <div class="qt-slot" id="qt-slot0"><span style="color:var(--gold);font-size:11px;font-weight:bold;">1</span><span style="color:#ccc;font-size:9px;">과거</span></div>
+    <div class="qt-slot" id="qt-slot1"><span style="color:var(--gold);font-size:11px;font-weight:bold;">2</span><span style="color:#ccc;font-size:9px;">현재</span></div>
+    <div class="qt-slot" id="qt-slot2"><span style="color:var(--gold);font-size:11px;font-weight:bold;">3</span><span style="color:#ccc;font-size:9px;">미래</span></div>
+  </div>
+  <div class="qt-table-wrap">
+    <svg class="qt-svg" viewBox="0 0 600 600"><g id="qt-main-g"></g></svg>
+  </div>
+  <div id="qt-pick-footer">
+    <button class="qt-btn-sec" onclick="qtShuffle()">카드 섞기</button>
+    <button class="qt-btn-pri" onclick="qtConfirm()">선택 완료 →</button>
+  </div>
+</div>
+
+<!-- 빛의 타로: 결과 -->
+<div id="qt-result">
+  <div id="qt-result-scroll">
+    <div style="color:var(--gold);font-size:20px;letter-spacing:3px;margin-bottom:20px;">✦ 해석 결과 ✦</div>
+    <div class="qt-res-cards" id="qt-res-cards"></div>
+    <div id="qt-res-content" style="width:100%;max-width:420px;"></div>
+  </div>
+  <div id="qt-result-btns">
+    <button id="qt-continue-btn" onclick="qtContinue()" style="flex:1;background:linear-gradient(135deg,#c9a227,#e8cc5a,#c9a227);color:#0a0700;border:none;padding:14px 0;border-radius:25px;font-weight:bold;cursor:pointer;font-size:13px;font-family:'Noto Serif KR',serif;">🔮 이어서 상담할래요</button>
+    <button onclick="qtGoHome()" style="flex:1;background:transparent;color:var(--gold);border:1.5px solid var(--gold-dim);padding:14px 0;border-radius:25px;font-weight:bold;cursor:pointer;font-size:13px;font-family:'Noto Serif KR',serif;">✦ 다음에 다시 올게요</button>
+  </div>
+</div>
+
+<!-- 빛의 타로: 이어서 상담 모달 -->
+<div id="qt-continue-modal" class="qt-overlay">
+  <div class="qt-box">
+    <span class="qt-candle" style="left:25px;">🕯️</span>
+    <span class="qt-candle" style="right:25px;">🕯️</span>
+    <h3 style="color:var(--gold);margin:0 0 8px;font-size:18px;">🕯️ 이어서 상담하기</h3>
+    <p style="color:#aaa;font-size:12px;margin:0 0 14px;line-height:1.6;">이전 상담 내용을 바탕으로<br>새로운 질문을 이어갈 수 있어요</p>
+    <div id="qt-prev-q-box" style="background:#0a0700;border:1px solid #2a1a00;border-radius:10px;padding:12px;margin-bottom:14px;color:#ccc;font-size:12px;text-align:left;line-height:1.6;">
+      <div style="color:#8a6f1a;font-size:10px;margin-bottom:4px;">▸ 이전 질문</div>
+      <div id="qt-prev-q-text"></div>
+    </div>
+    <div style="position:relative;width:100%;">
+      <textarea id="qt-continue-input" class="qt-input" placeholder="이어서 궁금한 점을 입력해주세요..."></textarea>
+    </div>
+    <button class="qt-gold-btn" onclick="qtStartContinue()" style="margin-bottom:10px;">✦ 카드 3장을 다시 뽑아주세요 ✦</button>
+    <button onclick="qtCloseContinueModal()" style="width:100%;background:transparent;color:var(--gold);border:1.5px solid var(--gold-dim);padding:12px 0;border-radius:25px;font-weight:bold;cursor:pointer;font-size:13px;font-family:'Noto Serif KR',serif;">← 결과로 돌아가기</button>
+  </div>
+</div>
+
+<script>
+/* ══ iOS Safari 높이 보정 ══ */
+function setAppHeight() {
+  document.documentElement.style.setProperty('--app-height', window.innerHeight + 'px');
+}
+setAppHeight();
+window.addEventListener('resize', setAppHeight);
+window.addEventListener('orientationchange', function(){ setTimeout(setAppHeight, 200); });
+
+/* ══ 공통: 물방울 소리 (삭제) ══ */
+function playDrop() {}
+
+/* ══ 공통: 화면 전환 ══ */
+function go(id) {
+  document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+}
+
+/* ══════════════════════════════
+   고민상담 로직
+══════════════════════════════ */
+var selectedCards = [], currentType = '';
+
+/* TAROT_CARDS 는 QT_DECK 선언 후 아래에서 alias 처리 */
+var TAROT_CARDS = null; /* QT_DECK 선언 후 초기화 */
+
+function startTarot(type) {
+  currentType = type;
+  createCards();
+  go('card-select');
+}
+
+function createCards() {
+  var grid = document.getElementById('cards-grid');
+  grid.innerHTML = '';
+  selectedCards = [];
+  /* 78장에서 Fisher-Yates 셔플 후 15장 */
+  var shuffled = dfFisherYates(TAROT_CARDS);
+  var pool = shuffled.slice(0, 15);
+  pool.forEach(function(tarot) {
+    var card = document.createElement('div');
+    card.className = 'card';
+    var inner = document.createElement('div'); inner.className = 'card-inner';
+    var back = document.createElement('div'); back.className = 'card-face card-back';
+    var front = document.createElement('div'); front.className = 'card-face card-front';
+    var img = document.createElement('img'); img.src = tarot.img;
+    front.appendChild(img); inner.appendChild(back); inner.appendChild(front); card.appendChild(inner);
+    (function(t, c) {
+      c.onclick = function() {
+        if (selectedCards.length < 3 && !c.classList.contains('flipped')) {
+          c.classList.add('flipped'); selectedCards.push(t);
+        }
+      };
+    })(tarot, card);
+    grid.appendChild(card);
+  });
+}
+
+async function goResult() {
+  if (selectedCards.length < 3) { alert('3장을 선택해 주세요!'); return; }
+  var row = document.getElementById('result-cards-row');
+  row.innerHTML = '';
+  selectedCards.forEach(function(card) {
+    var item = document.createElement('div'); item.className = 'result-card-item';
+    var img = document.createElement('img'); img.className = 'result-card-img'; img.src = card.img; img.alt = card.name;
+    var nameDiv = document.createElement('div'); nameDiv.className = 'result-card-name'; nameDiv.textContent = card.name;
+    item.appendChild(img); item.appendChild(nameDiv); row.appendChild(item);
+  });
+  var box = document.getElementById('result-reading-box');
+  box.innerHTML = '';
+  var span = document.createElement('span'); span.className = 'loading-text'; span.textContent = 'AI가 카드를 읽고 있습니다...';
+  box.appendChild(span);
+  go('result-screen');
+  try {
+    var cardNames = selectedCards.map(function(c, i) { return (i+1) + '번째 카드: ' + c.name; }).join(', ');
+    var prompt = '당신은 신비로운 타로 점술사입니다. ' + currentType + '에 관해 뽑힌 카드 3장을 해석해 주세요.\n\n' + cardNames + '\n\n각 카드의 의미와 전체적인 흐름을 부드럽고 신비로운 말투로 한국어로 해석해주세요. 300자 내외로 써주세요.';
+    var res = await fetch('https://silent-resonance-eb9f.xrhtmxm.workers.dev/api/tarot', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({prompt: prompt})
+    });
+    var data = await res.json();
+    var text = '';
+    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+      text = data.candidates[0].content.parts.map(function(p){return p.text||'';}).join('').trim();
+    }
+    if (!text) text = '해석을 불러오지 못했습니다.';
+    box.innerHTML = '';
+    text.split('\n').forEach(function(line, idx) {
+      if (idx > 0) box.appendChild(document.createElement('br'));
+      box.appendChild(document.createTextNode(line));
+    });
+  } catch(e) { box.textContent = '오류가 발생했습니다.'; }
+}
+
+/* ══════════════════════════════
+   빛의 타로 로직
+══════════════════════════════ */
+var qtLuck = '', qtQuestion = '', qtPicked = [], qtUsed = new Set();
+var qtRecognition = null, qtListening = false; /* 음성인식 제거됨 - 호환용 변수만 유지 */
+
+var qtGlowRGB = null, qtGlowAnim = null, qtLampPhase = 0;
+
+/* ── 램프 캔버스 (사용 안함 - 호환용 스텁) ── */
+var qtLampCvs = null, qtLampCtx = null;
+function qtInitLamp() {}
+function qtResizeLamp() {}
+var QT_LAMP_CFG = [];
+function qtDrawOneLamp() {}
+function qtAnimateLamps() {}
+
+/* ── 글로우 캔버스 (사용 안함 - 호환용 스텁) ── */
+var qtGlowCvs = null, qtGlowCtx = null;
+function qtInitGlow() {}
+function qtResizeGlow() {}
+function qtDrawGlow() {}
+function qtStartGlow(rgb) {}
+function qtStopGlow() {}
+
+/* ── 질문타로 화면 진입 ── */
+var qtIntroReady = false;
+var qtIntroBusy = false;
+var qtIntroParticles = [];
+var qtSparkleCtx = null;
+var qtSparkleCanvas = null;
+
+function qtInitIntro() {
+  if (qtIntroReady) return;
+  qtSparkleCanvas = document.getElementById('qt-sparkle-canvas');
+  if (!qtSparkleCanvas) return;
+  qtSparkleCtx = qtSparkleCanvas.getContext('2d');
+  qtIntroReady = true;
+
+  function resizeCanvas() {
+    if (!qtSparkleCanvas || !qtSparkleCanvas.parentElement) return;
+    qtSparkleCanvas.width = qtSparkleCanvas.parentElement.offsetWidth;
+    qtSparkleCanvas.height = qtSparkleCanvas.parentElement.offsetHeight;
+  }
+
+  function Particle(x, y, color) {
+    this.x = x;
+    this.y = y;
+    this.color = color;
+    this.size = Math.random() * 1.5 + 0.5;
+    this.speedX = (Math.random() - 0.5) * 1;
+    this.speedY = (Math.random() - 0.5) * 1;
+    this.life = 1;
+    this.decay = Math.random() * 0.03 + 0.02;
+  }
+  Particle.prototype.update = function() {
+    this.x += this.speedX;
+    this.y += this.speedY;
+    this.life -= this.decay;
+  };
+  Particle.prototype.draw = function() {
+    qtSparkleCtx.globalAlpha = this.life;
+    qtSparkleCtx.fillStyle = this.color;
+    qtSparkleCtx.beginPath();
+    qtSparkleCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    qtSparkleCtx.fill();
+  };
+
+  qtCreateParticle = function(x, y, color) {
+    qtIntroParticles.push(new Particle(x, y, color));
+  };
+
+  function animate() {
+    if (!qtSparkleCtx || !qtSparkleCanvas) return;
+    qtSparkleCtx.clearRect(0, 0, qtSparkleCanvas.width, qtSparkleCanvas.height);
+    for (var i = 0; i < qtIntroParticles.length; i++) {
+      qtIntroParticles[i].update();
+      qtIntroParticles[i].draw();
+      if (qtIntroParticles[i].life <= 0) {
+        qtIntroParticles.splice(i, 1);
+        i--;
+      }
+    }
+    requestAnimationFrame(animate);
+  }
+
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+  animate();
+}
+
+function qtResetIntro() {
+  qtInitIntro();
+  qtIntroBusy = false;
+  qtIntroParticles = [];
+  qtLuck = '';
+  document.getElementById('qt-luck-label').textContent = '';
+  document.querySelectorAll('#qt-flower-grid .qt-flower-trigger').forEach(function(btn) {
+    btn.classList.remove('selected');
+  });
+
+  var butterfly = document.getElementById('qt-butterfly');
+  var flame = document.getElementById('qt-flame');
+  var askModal = document.getElementById('qt-ask-modal');
+  if (askModal) askModal.style.display = 'none';
+
+  if (butterfly) {
+    butterfly.style.opacity = '1';
+    butterfly.style.left = '50%';
+    butterfly.style.top = '45px';
+    butterfly.style.transform = 'translate(-50%, -50%)';
+    butterfly.style.filter = 'drop-shadow(0 0 10px gold)';
+    if (butterfly.getAnimations) {
+      butterfly.getAnimations().forEach(function(anim) { anim.cancel(); });
+    }
+  }
+  var bfInner = document.getElementById('qt-bf-inner');
+  if (bfInner) bfInner.classList.remove('flapping');
+
+  if (flame) {
+    flame.classList.remove('show');
+    flame.style.background = '';
+    flame.style.boxShadow = '';
+  }
+}
+
+function goQtScreen() {
+  go('question-tarot');
+  qtResetIntro();
+}
+/* resize 리스너 (호환용) */
+window.addEventListener('resize', function() {});
+
+/* ── 질문타로 첫 화면 나비 선택 ── */
+function qtButterflySelect(event, luckName, hexColor, rgb) {
+  qtInitIntro();
+  if (qtIntroBusy) return;
+  qtIntroBusy = true;
+
+  var trigger = event.currentTarget;
+  var butterfly = document.getElementById('qt-butterfly');
+  var bfInner = document.getElementById('qt-bf-inner');
+  var flame = document.getElementById('qt-flame');
+  var wick = document.getElementById('qt-wick-point');
+  var container = document.getElementById('qt-main');
+  if (!trigger || !butterfly || !bfInner || !flame || !wick || !container) {
+    qtSelectLuck(luckName, rgb);
+    qtIntroBusy = false;
+    return;
+  }
+
+  document.querySelectorAll('#qt-flower-grid .qt-flower-trigger').forEach(function(btn) {
+    btn.classList.remove('selected');
+  });
+  trigger.classList.add('selected');
+  qtSelectLuck(luckName, rgb);
+
+  var containerRect = container.getBoundingClientRect();
+  var fRect = trigger.getBoundingClientRect();
+  var wRect = wick.getBoundingClientRect();
+  var fx = fRect.left - containerRect.left + fRect.width / 2;
+  var fy = fRect.top - containerRect.top + fRect.height / 2;
+  var wx = wRect.left - containerRect.left;
+  var wy = wRect.top - containerRect.top;
+
+  bfInner.classList.add('flapping');
+  butterfly.style.filter = 'drop-shadow(0 0 12px ' + hexColor + ')';
+
+  var trailInterval = setInterval(function() {
+    var bRect = butterfly.getBoundingClientRect();
+    var cRect = qtSparkleCanvas.getBoundingClientRect();
+    var bx = bRect.left - cRect.left + bRect.width / 2;
+    var by = bRect.top - cRect.top + bRect.height / 2;
+    for (var i = 0; i < 3; i++) {
+      qtCreateParticle(bx, by, hexColor);
+    }
+  }, 50);
+
+  var animation = butterfly.animate([
+    { left: '50%', top: '45px', transform: 'translate(-50%, -50%) rotate(0deg) scale(1)' },
+    { left: fx + 'px', top: fy + 'px', transform: 'translate(-50%, -50%) rotate(' + (fx > containerRect.width / 2 ? 15 : -15) + 'deg) scale(1.1)', offset: 0.5 },
+    { left: wx + 'px', top: wy + 'px', transform: 'translate(-50%, -50%) rotate(0deg) scale(0.6)', offset: 1 }
+  ], {
+    duration: 4500,
+    easing: 'cubic-bezier(0.42, 0, 0.58, 1)',
+    fill: 'forwards'
+  });
+
+  animation.onfinish = function() {
+    clearInterval(trailInterval);
+    butterfly.style.opacity = '0';
+    bfInner.classList.remove('flapping');
+
+    flame.classList.add('show');
+    flame.style.background = 'radial-gradient(ellipse at 50% 95%, #fff 0%, rgba(255,255,255,0.9) 20%, ' + hexColor + ' 65%, transparent 100%)';
+    flame.style.boxShadow = '0 -8px 40px 10px ' + hexColor + ', 0 -15px 80px 20px ' + hexColor + ', 0 0 30px rgba(255,255,255,0.5)';
+
+    setTimeout(function() {
+      butterfly.style.opacity = '1';
+      butterfly.style.left = '50%';
+      butterfly.style.top = '45px';
+      butterfly.style.transform = 'translate(-50%, -50%)';
+      butterfly.style.filter = 'drop-shadow(0 0 10px gold)';
+      if (butterfly.getAnimations) {
+        butterfly.getAnimations().forEach(function(anim) { anim.cancel(); });
+      }
+      qtIntroBusy = false;
+    }, 2000);
+  };
+}
+
+/* ── 운세 선택 ── */
+function qtSelectLuck(n, rgb) {
+  qtLuck = n; qtStartGlow(rgb);
+  document.getElementById('qt-luck-label').textContent = '분야: ' + n;
+}
+
+/* ── 질문 모달 ── */
+/* ── 채팅 상태 ── */
+var qtChatHistory = [];
+var qtChatTurns = 0;
+var qtChatReady = false;
+var qtChatBusy = false;
+
+function qtOpenAsk() {
+  if (!qtLuck) { alert('운세를 먼저 선택하세요.'); return; }
+  qtStopGlow();
+  qtChatHistory = [];
+  qtChatTurns = 0;
+  qtChatReady = false;
+  qtChatBusy = false;
+  document.getElementById('qt-q-input').value = '';
+  document.getElementById('qt-chat-messages').innerHTML = '';
+  document.getElementById('qt-draw-trigger').style.display = 'none';
+  document.getElementById('qt-chat-luck-label').textContent = '분야: ' + qtLuck;
+  document.getElementById('qt-luck-label').textContent = '분야: ' + qtLuck;
+  document.getElementById('qt-ask-modal').style.display = 'flex';
+  qtChatAiGreet();
+}
+
+function qtCloseChat() {
+  document.getElementById('qt-ask-modal').style.display = 'none';
+}
+
+function qtAddMsg(role, text) {
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;flex-direction:column;align-items:' + (role==='user'?'flex-end':'flex-start') + ';';
+  var bubble = document.createElement('div');
+  bubble.style.cssText = [
+    'max-width:78%;padding:10px 14px;',
+    'border-radius:' + (role==='user'?'18px 18px 4px 18px':'18px 18px 18px 4px') + ';',
+    'font-size:13px;line-height:1.65;font-family:\'Noto Serif KR\',serif;word-break:keep-all;',
+    role==='user'
+      ? 'background:linear-gradient(135deg,#3a2500,#5a3a00);color:#ffe8a0;border:1px solid rgba(180,140,60,0.4);'
+      : 'background:#1a1008;color:#e8d8b0;border:1px solid rgba(180,140,60,0.2);'
+  ].join('');
+  bubble.style.whiteSpace = 'pre-wrap';
+  bubble.textContent = text;
+  wrap.appendChild(bubble);
+  var msgs = document.getElementById('qt-chat-messages');
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function qtAddTyping() {
+  var wrap = document.createElement('div');
+  wrap.id = 'qt-typing-indicator';
+  wrap.style.cssText = 'display:flex;align-items:flex-start;';
+  var bubble = document.createElement('div');
+  bubble.style.cssText = 'background:#1a1008;border:1px solid rgba(180,140,60,0.2);border-radius:18px 18px 18px 4px;padding:12px 16px;display:flex;gap:5px;align-items:center;';
+  bubble.innerHTML = '<span style="width:7px;height:7px;background:#c9a227;border-radius:50%;animation:qt-typing-dot 1.2s infinite 0s;display:inline-block;"></span><span style="width:7px;height:7px;background:#c9a227;border-radius:50%;animation:qt-typing-dot 1.2s infinite 0.2s;display:inline-block;"></span><span style="width:7px;height:7px;background:#c9a227;border-radius:50%;animation:qt-typing-dot 1.2s infinite 0.4s;display:inline-block;"></span>';
+  wrap.appendChild(bubble);
+  var msgs = document.getElementById('qt-chat-messages');
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function qtRemoveTyping() {
+  var el = document.getElementById('qt-typing-indicator');
+  if (el) el.remove();
+}
+
+function qtChatAiGreet() {
+  qtChatBusy = true;
+  var greetMap = {
+    '연애운':   '어서 오세요 💕\n연애운을 선택하셨군요.\n요즘 마음에 담아둔 사람이 있으신가요? 편하게 이야기해 주세요.',
+    '이사운':   '어서 오세요 🏠\n이사운을 선택하셨군요.\n이사 관련해서 어떤 점이 궁금하세요?',
+    '재물운':   '어서 오세요 💰\n재물운을 선택하셨군요.\n요즘 금전적으로 고민이 있으신가요?',
+    '합격운':   '어서 오세요 📚\n합격운을 선택하셨군요.\n시험이나 취업 준비 중이신가요? 무엇이 궁금하세요?',
+    '사업운':   '어서 오세요 📈\n사업운을 선택하셨군요.\n사업이나 일에 관해 어떤 점이 걱정되세요?',
+    '건강운':   '어서 오세요 🌿\n건강운을 선택하셨군요.\n몸이나 마음 건강에 대해 궁금한 게 있으신가요?',
+    '대인관계': '어서 오세요 🤝\n대인관계운을 선택하셨군요.\n요즘 사람 관계에서 힘드신 점이 있으신가요?',
+    '오늘의운세':'어서 오세요 ✨\n오늘의 운세를 보러 오셨군요.\n오늘 특별히 신경 쓰이는 게 있으신가요?'
+  };
+  var msg = greetMap[qtLuck] || ('어서 오세요 🕯️\n' + qtLuck + '을 선택하셨군요.\n무엇이 궁금하세요?');
+  qtAddMsg('model', msg);
+  qtChatHistory.push({role:'model', text:msg});
+  qtChatBusy = false;
+}
+
+async function qtChatSend() {
+  if (qtChatBusy) return;
+  var input = document.getElementById('qt-q-input');
+  var text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  input.style.height = '40px';
+  qtAddMsg('user', text);
+  qtChatHistory.push({role:'user', text:text});
+  qtChatTurns++;
+  qtChatBusy = true;
+  qtAddTyping();
+
+  var historyText = qtChatHistory.map(function(h){
+    return (h.role==='user'?'사용자':'상담사') + ': ' + h.text;
+  }).join('\n');
+
+  var isContinue = qtConvHistory.length > 0;
+
+  var fullPrompt = '당신은 따뜻하고 공감 능력이 뛰어난 타로 상담사입니다. 분야는 [' + qtLuck + '] 입니다.\n' +
+    '카카오톡처럼 짧고 자연스러운 한국어 대화체로 답하세요.\n' +
+    '이모지를 1~2개 자연스럽게 사용해도 좋아요. 한 답변은 3~5문장 이내로 짧게.\n\n' +
+    '반드시 아래 JSON 형식으로만 응답하세요:\n' +
+    '{"reply":"답변텍스트","ready":true또는false}\n\n' +
+    '【ready 판단 기준】\n' +
+    'ready:true → 사용자의 질문/고민이 명확하게 파악되어 지금 바로 타로 카드로 봐드릴 수 있는 상태\n' +
+    '  예) "만날 수 있을까요" "합격할까요" "재회될까요" 처럼 구체적 질문이 있을 때\n' +
+    '  ready:true면 reply 끝에 "타로 카드로 한번 봐드릴게요 🃏" 추가\n' +
+    'ready:false → 아직 상황을 더 들어야 하거나 공감/위로가 먼저인 경우\n' +
+    (isContinue ? 'ready:true로 설정하세요 (이어서 상담 중)\n' : '') +
+    '\n[대화 내용]\n' + historyText + '\n사용자: ' + text + '\n\nJSON만 출력:';
+
+  var raw = await qtCallChat(fullPrompt);
+  qtRemoveTyping();
+
+  var reply = raw;
+  var readyNow = isContinue;
+  try {
+    var js = raw.indexOf('{'), je = raw.lastIndexOf('}');
+    if (js >= 0 && je > js) {
+      var parsed = JSON.parse(raw.slice(js, je+1));
+      if (parsed.reply) reply = parsed.reply;
+      if (typeof parsed.ready === 'boolean') readyNow = parsed.ready;
+    }
+  } catch(pe) {}
+
+  qtAddMsg('model', reply);
+  qtChatHistory.push({role:'model', text:reply});
+
+  if (readyNow && !qtChatReady) {
+    qtChatReady = true;
+    document.getElementById('qt-draw-trigger').style.display = 'block';
+    var msgs = document.getElementById('qt-chat-messages');
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+  qtChatBusy = false;
+}
+
+
+async function qtCallChat(fullPrompt) {
+  try {
+    var res = await fetch('https://silent-resonance-eb9f.xrhtmxm.workers.dev/api/tarot', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({prompt: fullPrompt})
+    });
+    var rawText = await res.text();
+    console.log('[qtCallChat] status:', res.status, 'body:', rawText.slice(0, 300));
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' / ' + rawText.slice(0,100));
+    var data;
+    try { data = JSON.parse(rawText); } catch(pe) { throw new Error('JSON 파싱 실패: ' + rawText.slice(0,100)); }
+    /* Gemini 형식 */
+    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+      var txt = data.candidates[0].content.parts.map(function(p){return p.text||'';}).join('').trim();
+      if (txt) return txt;
+    }
+    /* Anthropic 형식 */
+    if (data.content && Array.isArray(data.content)) {
+      var atxt = data.content.map(function(c){return c.text||'';}).join('').trim();
+      if (atxt) return atxt;
+    }
+    /* 에러 응답 */
+    if (data.error) throw new Error(JSON.stringify(data.error));
+    throw new Error('빈 응답: ' + rawText.slice(0,100));
+  } catch(e) {
+    console.error('[qtCallChat] 오류:', e.message);
+    return '⚠️ [오류] ' + e.message;
+  }
+}
+
+/* ── 카드 뽑기 시작 ── */
+function qtStartTarot() {
+  var lastUserMsg = '';
+  for (var i = qtChatHistory.length - 1; i >= 0; i--) {
+    if (qtChatHistory[i].role === 'user') { lastUserMsg = qtChatHistory[i].text; break; }
+  }
+  qtQuestion = lastUserMsg || '타로 상담';
+  document.getElementById('qt-ask-modal').style.display = 'none';
+  document.getElementById('qt-pick-layer').style.display = 'flex';
+  setTimeout(qtInitTable, 80);
+}
+
+/* ── 78장 덱 ── */
+var QT_BASE = 'https://upload.wikimedia.org/wikipedia/commons/thumb/';
+var QT_DECK = [
+  /* ── 메이저 아르카나 22장 ── */
+  {name:'광대',         img:QT_BASE+'9/90/RWS_Tarot_00_Fool.jpg/120px-RWS_Tarot_00_Fool.jpg'},
+  {name:'마법사',       img:QT_BASE+'1/10/RWS_Tarot_01_Magician.jpg/120px-RWS_Tarot_01_Magician.jpg'},
+  {name:'여사제',       img:QT_BASE+'8/88/RWS_Tarot_02_High_Priestess.jpg/120px-RWS_Tarot_02_High_Priestess.jpg'},
+  {name:'여황제',       img:QT_BASE+'d/d2/RWS_Tarot_03_Empress.jpg/120px-RWS_Tarot_03_Empress.jpg'},
+  {name:'황제',         img:QT_BASE+'c/c3/RWS_Tarot_04_Emperor.jpg/120px-RWS_Tarot_04_Emperor.jpg'},
+  {name:'교황',         img:QT_BASE+'8/8d/RWS_Tarot_05_Hierophant.jpg/120px-RWS_Tarot_05_Hierophant.jpg'},
+  {name:'연인',         img:QT_BASE+'d/db/RWS_Tarot_06_Lovers.jpg/120px-RWS_Tarot_06_Lovers.jpg'},
+  {name:'전차',         img:QT_BASE+'9/9b/RWS_Tarot_07_Chariot.jpg/120px-RWS_Tarot_07_Chariot.jpg'},
+  {name:'힘',           img:QT_BASE+'f/f5/RWS_Tarot_08_Strength.jpg/120px-RWS_Tarot_08_Strength.jpg'},
+  {name:'은둔자',       img:QT_BASE+'4/4d/RWS_Tarot_09_Hermit.jpg/120px-RWS_Tarot_09_Hermit.jpg'},
+  {name:'운명의수레바퀴',img:QT_BASE+'3/3c/RWS_Tarot_10_Wheel_of_Fortune.jpg/120px-RWS_Tarot_10_Wheel_of_Fortune.jpg'},
+  {name:'정의',         img:QT_BASE+'e/e0/RWS_Tarot_11_Justice.jpg/120px-RWS_Tarot_11_Justice.jpg'},
+  {name:'매달린사람',   img:QT_BASE+'2/2b/RWS_Tarot_12_Hanged_Man.jpg/120px-RWS_Tarot_12_Hanged_Man.jpg'},
+  {name:'죽음',         img:QT_BASE+'d/d7/RWS_Tarot_13_Death.jpg/120px-RWS_Tarot_13_Death.jpg'},
+  {name:'절제',         img:QT_BASE+'f/f8/RWS_Tarot_14_Temperance.jpg/120px-RWS_Tarot_14_Temperance.jpg'},
+  {name:'악마',         img:QT_BASE+'5/55/RWS_Tarot_15_Devil.jpg/120px-RWS_Tarot_15_Devil.jpg'},
+  {name:'탑',           img:QT_BASE+'5/53/RWS_Tarot_16_Tower.jpg/120px-RWS_Tarot_16_Tower.jpg'},
+  {name:'별',           img:QT_BASE+'d/db/RWS_Tarot_17_Star.jpg/120px-RWS_Tarot_17_Star.jpg'},
+  {name:'달',           img:QT_BASE+'7/7f/RWS_Tarot_18_Moon.jpg/120px-RWS_Tarot_18_Moon.jpg'},
+  {name:'태양',         img:QT_BASE+'1/17/RWS_Tarot_19_Sun.jpg/120px-RWS_Tarot_19_Sun.jpg'},
+  {name:'심판',         img:QT_BASE+'d/dd/RWS_Tarot_20_Judgement.jpg/120px-RWS_Tarot_20_Judgement.jpg'},
+  {name:'세계',         img:QT_BASE+'f/ff/RWS_Tarot_21_World.jpg/120px-RWS_Tarot_21_World.jpg'},
+  /* ── 완즈(Wands) 14장 ── */
+  {name:'완즈A',  img:QT_BASE+'1/11/Wands01.jpg/120px-Wands01.jpg'},
+  {name:'완즈2',  img:QT_BASE+'0/0f/Wands02.jpg/120px-Wands02.jpg'},
+  {name:'완즈3',  img:QT_BASE+'f/ff/Wands03.jpg/120px-Wands03.jpg'},
+  {name:'완즈4',  img:QT_BASE+'a/a4/Wands04.jpg/120px-Wands04.jpg'},
+  {name:'완즈5',  img:QT_BASE+'9/9d/Wands05.jpg/120px-Wands05.jpg'},
+  {name:'완즈6',  img:QT_BASE+'3/3b/Wands06.jpg/120px-Wands06.jpg'},
+  {name:'완즈7',  img:QT_BASE+'e/e4/Wands07.jpg/120px-Wands07.jpg'},
+  {name:'완즈8',  img:QT_BASE+'6/6b/Wands08.jpg/120px-Wands08.jpg'},
+  {name:'완즈9',  img:QT_BASE+'e/e7/Wands09.jpg/120px-Wands09.jpg'},
+  {name:'완즈10', img:QT_BASE+'0/0b/Wands10.jpg/120px-Wands10.jpg'},
+  {name:'완즈시종',img:QT_BASE+'6/6a/Wands11.jpg/120px-Wands11.jpg'},
+  {name:'완즈기사',img:QT_BASE+'1/16/Wands12.jpg/120px-Wands12.jpg'},
+  {name:'완즈여왕',img:QT_BASE+'0/0d/Wands13.jpg/120px-Wands13.jpg'},
+  {name:'완즈왕',  img:QT_BASE+'c/ce/Wands14.jpg/120px-Wands14.jpg'},
+  /* ── 컵(Cups) 14장 ── */
+  {name:'컵A',    img:QT_BASE+'3/36/Cups01.jpg/120px-Cups01.jpg'},
+  {name:'컵2',    img:QT_BASE+'f/f8/Cups02.jpg/120px-Cups02.jpg'},
+  {name:'컵3',    img:QT_BASE+'7/7a/Cups03.jpg/120px-Cups03.jpg'},
+  {name:'컵4',    img:QT_BASE+'3/35/Cups04.jpg/120px-Cups04.jpg'},
+  {name:'컵5',    img:QT_BASE+'d/d7/Cups05.jpg/120px-Cups05.jpg'},
+  {name:'컵6',    img:QT_BASE+'1/17/Cups06.jpg/120px-Cups06.jpg'},
+  {name:'컵7',    img:QT_BASE+'a/ae/Cups07.jpg/120px-Cups07.jpg'},
+  {name:'컵8',    img:QT_BASE+'6/60/Cups08.jpg/120px-Cups08.jpg'},
+  {name:'컵9',    img:QT_BASE+'2/24/Cups09.jpg/120px-Cups09.jpg'},
+  {name:'컵10',   img:QT_BASE+'8/84/Cups10.jpg/120px-Cups10.jpg'},
+  {name:'컵시종', img:QT_BASE+'a/ad/Cups11.jpg/120px-Cups11.jpg'},
+  {name:'컵기사', img:QT_BASE+'f/fa/Cups12.jpg/120px-Cups12.jpg'},
+  {name:'컵여왕', img:QT_BASE+'6/62/Cups13.jpg/120px-Cups13.jpg'},
+  {name:'컵왕',   img:QT_BASE+'0/04/Cups14.jpg/120px-Cups14.jpg'},
+  /* ── 검(Swords) 14장 ── */
+  {name:'검A',    img:QT_BASE+'1/1a/Swords01.jpg/120px-Swords01.jpg'},
+  {name:'검2',    img:QT_BASE+'9/9e/Swords02.jpg/120px-Swords02.jpg'},
+  {name:'검3',    img:QT_BASE+'0/02/Swords03.jpg/120px-Swords03.jpg'},
+  {name:'검4',    img:QT_BASE+'b/bf/Swords04.jpg/120px-Swords04.jpg'},
+  {name:'검5',    img:QT_BASE+'2/23/Swords05.jpg/120px-Swords05.jpg'},
+  {name:'검6',    img:QT_BASE+'2/29/Swords06.jpg/120px-Swords06.jpg'},
+  {name:'검7',    img:QT_BASE+'3/34/Swords07.jpg/120px-Swords07.jpg'},
+  {name:'검8',    img:QT_BASE+'a/a7/Swords08.jpg/120px-Swords08.jpg'},
+  {name:'검9',    img:QT_BASE+'2/2f/Swords09.jpg/120px-Swords09.jpg'},
+  {name:'검10',   img:QT_BASE+'d/d4/Swords10.jpg/120px-Swords10.jpg'},
+  {name:'검시종', img:QT_BASE+'4/4c/Swords11.jpg/120px-Swords11.jpg'},
+  {name:'검기사', img:QT_BASE+'b/b0/Swords12.jpg/120px-Swords12.jpg'},
+  {name:'검여왕', img:QT_BASE+'d/d4/Swords13.jpg/120px-Swords13.jpg'},
+  {name:'검왕',   img:QT_BASE+'3/33/Swords14.jpg/120px-Swords14.jpg'},
+  /* ── 펜타클(Pentacles) 14장 ── */
+  {name:'펜타클A',  img:QT_BASE+'f/fd/Pents01.jpg/120px-Pents01.jpg'},
+  {name:'펜타클2',  img:QT_BASE+'9/9f/Pents02.jpg/120px-Pents02.jpg'},
+  {name:'펜타클3',  img:QT_BASE+'4/42/Pents03.jpg/120px-Pents03.jpg'},
+  {name:'펜타클4',  img:QT_BASE+'3/35/Pents04.jpg/120px-Pents04.jpg'},
+  {name:'펜타클5',  img:QT_BASE+'9/96/Pents05.jpg/120px-Pents05.jpg'},
+  {name:'펜타클6',  img:QT_BASE+'a/a6/Pents06.jpg/120px-Pents06.jpg'},
+  {name:'펜타클7',  img:QT_BASE+'6/6a/Pents07.jpg/120px-Pents07.jpg'},
+  {name:'펜타클8',  img:QT_BASE+'4/49/Pents08.jpg/120px-Pents08.jpg'},
+  {name:'펜타클9',  img:QT_BASE+'f/f0/Pents09.jpg/120px-Pents09.jpg'},
+  {name:'펜타클10', img:QT_BASE+'4/42/Pents10.jpg/120px-Pents10.jpg'},
+  {name:'펜타클시종',img:QT_BASE+'e/ec/Pents11.jpg/120px-Pents11.jpg'},
+  {name:'펜타클기사',img:QT_BASE+'d/d5/Pents12.jpg/120px-Pents12.jpg'},
+  {name:'펜타클여왕',img:QT_BASE+'8/88/Pents13.jpg/120px-Pents13.jpg'},
+  {name:'펜타클왕',  img:QT_BASE+'1/1c/Pents14.jpg/120px-Pents14.jpg'}
+];
+
+/* 고민상담·오늘의운세 모두 같은 78장 사용 */
+TAROT_CARDS = QT_DECK;
+
+function qtMakeCardImg(c) {
+  var div = document.createElement('div');
+  div.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:6px;';
+  var img = document.createElement('img');
+  img.src = c.img;
+  img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:6px;' + (c.rev ? 'transform:rotate(180deg);' : '') + 'opacity:0;transition:opacity 0.4s;';
+  img.onload = function() { img.style.opacity = 1; };
+  img.onerror = function() { div.textContent = c.name; div.style.color='#d4af37'; div.style.fontSize='9px'; };
+  div.appendChild(img);
+  return div;
+}
+
+function qtDrawRings(g) {
+  var ns = 'http://www.w3.org/2000/svg', CX=300, CY=300;
+  [88,168,248].forEach(function(r) {
+    var ringR = r+48, cnt = Math.round(2*Math.PI*ringR/7);
+    for (var i=0;i<cnt;i++) {
+      var a=(i/cnt)*Math.PI*2, x=CX+ringR*Math.cos(a), y=CY+ringR*Math.sin(a);
+      var c=document.createElementNS(ns,'circle');
+      c.setAttribute('cx',x.toFixed(2)); c.setAttribute('cy',y.toFixed(2)); c.setAttribute('r','2');
+      var br=0.55+0.45*Math.abs(Math.sin(a*3));
+      c.setAttribute('fill','rgb('+Math.round(212*br)+','+Math.round(175*br)+','+Math.round(55*br)+')');
+      c.setAttribute('opacity',(0.7+0.3*br).toFixed(2));
+      g.appendChild(c);
+    }
+    var rc=document.createElementNS(ns,'circle');
+    rc.setAttribute('cx',CX); rc.setAttribute('cy',CY); rc.setAttribute('r',ringR);
+    rc.setAttribute('fill','none'); rc.setAttribute('stroke','rgba(212,175,55,0.25)'); rc.setAttribute('stroke-width','0.8');
+    g.appendChild(rc);
+  });
+}
+
+function qtInitTable() {
+  var g = document.getElementById('qt-main-g');
+  g.innerHTML = ''; qtPicked = []; qtUsed = new Set();
+  ['qt-slot0','qt-slot1','qt-slot2'].forEach(function(id, i) {
+    var s = document.getElementById(id); s.classList.remove('active'); s.innerHTML = '';
+    var n=document.createElement('span'); n.style.cssText='color:#d4af37;font-size:11px;font-weight:bold;'; n.textContent=i+1;
+    var l=document.createElement('span'); l.style.cssText='color:#ccc;font-size:9px;'; l.textContent=['과거','현재','미래'][i];
+    s.appendChild(n); s.appendChild(l);
+  });
+  var ns='http://www.w3.org/2000/svg';
+  var rg=document.createElementNS(ns,'g'); qtDrawRings(rg); g.appendChild(rg);
+  var CW=52,CH=84;
+  [{n:18,r:88},{n:26,r:168},{n:34,r:248}].forEach(function(layer) {
+    for (var i=0;i<layer.n;i++) {
+      var ang=(i/layer.n)*Math.PI*2;
+      var cx=300+layer.r*Math.cos(ang), cy=300+layer.r*Math.sin(ang);
+      var x=cx-CW/2, y=cy-CH/2, rot=(ang*180/Math.PI)+90;
+      var card=document.createElementNS(ns,'g');
+      card.setAttribute('class','card-group');
+      card.style.transformOrigin=cx+'px '+cy+'px';
+      card.style.transform='rotate('+rot+'deg)';
+      card.dataset.cx=cx; card.dataset.cy=cy;
+      var rect1=document.createElementNS(ns,'rect');
+      rect1.setAttribute('x',x); rect1.setAttribute('y',y); rect1.setAttribute('width',CW); rect1.setAttribute('height',CH); rect1.setAttribute('rx','4'); rect1.setAttribute('class','card-body');
+      var rect2=document.createElementNS(ns,'rect');
+      rect2.setAttribute('x',x+3); rect2.setAttribute('y',y+3); rect2.setAttribute('width',CW-6); rect2.setAttribute('height',CH-6); rect2.setAttribute('rx','2'); rect2.setAttribute('class','card-inner-line');
+      var poly=document.createElementNS(ns,'polygon');
+      poly.setAttribute('points',cx+','+(cy-7)+' '+(cx+5)+','+cy+' '+cx+','+(cy+7)+' '+(cx-5)+','+cy); poly.setAttribute('class','card-diamond');
+      card.appendChild(rect1); card.appendChild(rect2); card.appendChild(poly);
+      (function(c) { c.onclick = function() { qtPickCard(c); }; })(card);
+      g.appendChild(card);
+    }
+  });
+}
+
+function qtPickCard(el) {
+  if (qtPicked.length>=3 || el.classList.contains('picked')) return;
+  el.classList.add('picked');
+  var ri; do { ri=Math.floor(Math.random()*QT_DECK.length); } while(qtUsed.has(ri));
+  qtUsed.add(ri);
+  var c=QT_DECK[ri], rev=Math.random()<0.3;
+  qtPicked.push({name:c.name,img:c.img,rev:rev});
+  var si=qtPicked.length-1;
+  var slot=document.getElementById('qt-slot'+si);
+  slot.classList.add('active'); slot.innerHTML='';
+  slot.appendChild(qtMakeCardImg({name:c.name,img:c.img,rev:rev}));
+}
+
+function qtShuffle() {
+  if (qtPicked.length>0) { alert('이미 카드를 선택하셨습니다.'); return; }
+  document.querySelectorAll('#qt-main-g .card-group').forEach(function(c) {
+    c.style.transition='transform 0.5s ease';
+    c.style.transform='translate('+(300-parseFloat(c.dataset.cx))+'px,'+(300-parseFloat(c.dataset.cy))+'px) rotate(0deg)';
+  });
+  setTimeout(qtInitTable, 750);
+}
+
+function qtConfirm() {
+  if (qtPicked.length<3) { alert('카드를 3장 모두 골라주세요!'); return; }
+  document.getElementById('qt-pick-layer').style.display='none';
+  document.getElementById('qt-result').style.display='flex';
+  qtRenderResults();
+}
+
+function qtRenderResults() {
+  var row = document.getElementById('qt-res-cards');
+  row.innerHTML='';
+  qtPicked.forEach(function(c) {
+    var wrap=document.createElement('div'); wrap.className='qt-res-card-wrap';
+    var box=document.createElement('div'); box.className='qt-res-card-img'; box.appendChild(qtMakeCardImg(c));
+    var name=document.createElement('div'); name.className='qt-res-card-name';
+    name.textContent=c.name; name.appendChild(document.createElement('br')); name.appendChild(document.createTextNode(c.rev?'역방향':'정방향'));
+    wrap.appendChild(box); wrap.appendChild(name); row.appendChild(wrap);
+  });
+  var cont = document.getElementById('qt-res-content');
+  cont.innerHTML='';
+  var orb=document.createElement('div'); orb.className='qt-loading-orb';
+  var txt=document.createElement('div'); txt.style.cssText='color:#ffea7a;font-size:13px;text-align:center;'; txt.textContent='타로 카드를 해석하는 중...';
+  cont.appendChild(orb); cont.appendChild(txt);
+  qtCallWorker();
+}
+
+async function qtCallWorker() {
+  var pos=['과거','현재','미래'];
+  var cardList=qtPicked.map(function(c,i){return pos[i]+': '+c.name+' '+(c.rev?'[역방향]':'[정방향]');}).join('\n');
+  var jsonFmt='{"intro":"2~3문장","c0":"과거 카드 해석","c1":"현재 카드 해석","c2":"미래 카드 해석","total":"종합 해석","adv":"실천 조언","closing":"마무리"}';
+  var chatContext = qtChatHistory.length > 0
+    ? '\n\n[상담 대화 내용]\n' + qtChatHistory.map(function(h){return (h.role==='user'?'내담자':'상담사')+': '+h.text;}).join('\n')
+    : '';
+  var prompt='당신은 따뜻하고 통찰력 있는 타로 리더입니다. 부드럽고 다정한 한국어로 답하세요.\n운세 분야: '+qtLuck+'\n질문: '+qtQuestion+chatContext+'\n\n[뽑힌 카드]\n'+cardList+'\n\n아래 JSON 형식으로만 답하세요:\n'+jsonFmt;
+
+  var cont=document.getElementById('qt-res-content');
+  function show(html) { cont.innerHTML=html; }
+
+  try {
+    var res=await fetch('https://silent-resonance-eb9f.xrhtmxm.workers.dev/api/tarot',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prompt:prompt})
+    });
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    var data=await res.json();
+    if (data.error) throw new Error(JSON.stringify(data.error));
+    var cands=data.candidates||[];
+    if (!cands.length||!cands[0].content) throw new Error('응답이 비어있어요');
+    var raw=cands[0].content.parts.map(function(p){return p.text||'';}).join('').trim();
+    var cleaned=raw.replace(/```json/gi,'').replace(/```/g,'').trim();
+    var js=cleaned.indexOf('{'), je=cleaned.lastIndexOf('}');
+    if (js<0||je<0) throw new Error('JSON 형식 오류');
+    var r=JSON.parse(cleaned.slice(js,je+1));
+    var pa=[['🌙','과거'],['✨','현재'],['⭐','미래']];
+    var h='';
+    if(r.intro) h+='<div class="qt-section" style="border-color:#2e2440;"><div class="qt-sec-h" style="color:#c9b6ff;">🕯️ 마음을 먼저 읽어보면</div><div class="qt-sec-b">'+r.intro+'</div></div>';
+    for(var i=0;i<3;i++) h+='<div class="qt-section"><div class="qt-sec-h">'+pa[i][0]+' '+pa[i][1]+' · '+qtPicked[i].name+' '+(qtPicked[i].rev?'(역방향)':'(정방향)')+'</div><div class="qt-sec-b">'+(r['c'+i]||'')+'</div></div>';
+    h+='<div class="qt-section" style="border-color:#3a2a08;"><div class="qt-sec-h" style="color:#ffea7a;">🔮 종합 해석</div><div class="qt-sec-b">'+(r.total||'')+'</div></div>';
+    h+='<div class="qt-section" style="border-color:#0a2010;"><div class="qt-sec-h" style="color:#90ee90;">🌿 실천 조언</div><div class="qt-sec-b" style="color:#c8e8c0;">'+(r.adv||'')+'</div></div>';
+    if(r.closing) h+='<div class="qt-section"><div class="qt-sec-h" style="color:#ffd67a;">💛 마지막 한마디</div><div class="qt-sec-b">'+r.closing+'</div></div>';
+    show(h);
+    document.getElementById('qt-result').scrollTo({top:0,behavior:'smooth'});
+  } catch(e) {
+    show('<div class="qt-section"><div class="qt-sec-b" style="color:#cc5555;text-align:center;">별들이 잠시 길을 잃었어요<br><br><span style="font-size:11px;color:#999;">'+(e.message||e)+'</span></div></div>');
+  }
+}
+
+function qtCloseResult() {
+  document.getElementById('qt-result').style.display='none';
+  qtLuck=''; qtQuestion=''; qtPicked=[]; qtUsed=new Set(); qtConvHistory=[]; qtChatHistory=[]; qtChatTurns=0; qtChatReady=false;
+  document.getElementById('qt-luck-label').textContent='';
+  document.getElementById('qt-q-input').value='';
+  go('question-tarot');
+}
+
+function qtGoHome() {
+  document.getElementById('qt-result').style.display='none';
+  document.getElementById('qt-pick-layer').style.display='none';
+  document.getElementById('qt-ask-modal').style.display='none';
+  document.getElementById('qt-continue-modal').style.display='none';
+  qtLuck=''; qtQuestion=''; qtPicked=[]; qtUsed=new Set(); qtConvHistory=[]; qtChatHistory=[]; qtChatTurns=0; qtChatReady=false;
+  qtStopGlow();
+  go('home');
+}
+
+/* ── 이어서 상담 ── */
+var qtConvHistory = [];
+
+function qtContinue() {
+  /* 결과 화면 닫고 채팅창 그대로 재오픈 */
+  document.getElementById('qt-result').style.display = 'none';
+  /* 이어서 상담 상태 기록 */
+  qtConvHistory.push({prev: qtQuestion});
+  /* 채팅창에 구분선 추가 */
+  var msgs = document.getElementById('qt-chat-messages');
+  var divider = document.createElement('div');
+  divider.style.cssText = 'text-align:center;color:#5a4010;font-size:11px;padding:8px 0;letter-spacing:1px;border-top:1px solid rgba(180,140,60,0.2);margin-top:4px;';
+  divider.textContent = '✦ 이어서 상담 ✦';
+  msgs.appendChild(divider);
+  msgs.scrollTop = msgs.scrollHeight;
+  /* 뽑기 버튼 숨기고 채팅 다시 활성화 */
+  document.getElementById('qt-draw-trigger').style.display = 'none';
+  qtChatReady = false;
+  qtChatBusy = false;
+  document.getElementById('qt-ask-modal').style.display = 'flex';
+  /* 이어서 상담 안내 메시지 - 하드코딩 */
+  var continueMsg = '해석 결과가 도움이 되셨나요? 🕯️\n더 궁금한 점이 있으시면 편하게 말씀해 주세요.';
+  qtAddMsg('model', continueMsg);
+  qtChatHistory.push({role:'model', text:continueMsg});
+  qtChatBusy = false;
+}
+
+function qtCloseContinueModal() {
+  document.getElementById('qt-continue-modal').style.display = 'none';
+}
+
+function qtStartContinue() {
+  /* 호환용 - 사용 안 함 */
+  document.getElementById('qt-continue-modal').style.display = 'none';
+}
+
+/* ── 배경음악 ── */
+var qtAudioCtx=null, qtMasterGain=null, qtMusicPlaying=false, qtMusicStarted=false;
+var qtDroneNodes=[], qtBellTimer=null, qtPadTimer=null;
+var QT_BOWLS=[216,288,324,432,576,648,324];
+
+function qtSinebell(freq,when,amp,attack,decay){
+  amp=amp||0.05; attack=attack||0.012; decay=decay||4.5;
+  if(!qtAudioCtx||!qtMusicPlaying) return;
+  [[freq,amp],[freq*2,amp*0.18],[freq*4,amp*0.04]].forEach(function(fa){
+    var o=qtAudioCtx.createOscillator(), g=qtAudioCtx.createGain();
+    var lp=qtAudioCtx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=fa[0]*3; lp.Q.value=0.3;
+    o.type='sine'; o.frequency.setValueAtTime(fa[0],when);
+    g.gain.setValueAtTime(0,when); g.gain.linearRampToValueAtTime(fa[1],when+attack); g.gain.exponentialRampToValueAtTime(0.0001,when+decay);
+    o.connect(lp); lp.connect(g); g.connect(qtMasterGain); o.start(when); o.stop(when+decay+0.1);
+  });
+}
+function qtScheduleBell(){
+  if(!qtAudioCtx||!qtMusicPlaying) return;
+  var now=qtAudioCtx.currentTime;
+  qtSinebell(QT_BOWLS[Math.floor(Math.random()*QT_BOWLS.length)],now,0.045+Math.random()*0.025,0.015,3.5+Math.random()*2.5);
+  qtBellTimer=setTimeout(qtScheduleBell,2800+Math.random()*3500);
+}
+function qtSinePad(freq,when,dur,amp){
+  dur=dur||12; amp=amp||0.012;
+  if(!qtAudioCtx||!qtMusicPlaying) return;
+  [freq,freq*2].forEach(function(f,i){
+    var o=qtAudioCtx.createOscillator(), g=qtAudioCtx.createGain();
+    var lp=qtAudioCtx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=500; lp.Q.value=0.1;
+    o.type='sine'; o.frequency.setValueAtTime(f,when);
+    var a=amp/Math.pow(1.8,i);
+    g.gain.setValueAtTime(0,when); g.gain.linearRampToValueAtTime(a,when+dur*0.3); g.gain.linearRampToValueAtTime(0,when+dur);
+    o.connect(lp); lp.connect(g); g.connect(qtMasterGain); o.start(when); o.stop(when+dur+0.2);
+  });
+}
+function qtSchedulePad(){
+  if(!qtAudioCtx||!qtMusicPlaying) return;
+  qtSinePad([108,144,162,216][Math.floor(Math.random()*4)],qtAudioCtx.currentTime,11+Math.random()*4,0.011);
+  qtPadTimer=setTimeout(qtSchedulePad,9000+Math.random()*4000);
+}
+function qtStartDrone(){
+  if(!qtAudioCtx) return; qtStopDrone();
+  [[108,0.025],[144,0.015]].forEach(function(fa){
+    var o=qtAudioCtx.createOscillator(), g=qtAudioCtx.createGain();
+    var lp=qtAudioCtx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=300;
+    o.type='sine'; o.frequency.value=fa[0];
+    g.gain.setValueAtTime(0,qtAudioCtx.currentTime); g.gain.linearRampToValueAtTime(fa[1],qtAudioCtx.currentTime+2.5);
+    o.connect(lp); lp.connect(g); g.connect(qtMasterGain); o.start(); qtDroneNodes.push({o:o,g:g});
+  });
+}
+function qtStopDrone(){
+  qtDroneNodes.forEach(function(n){ try{ n.g.gain.linearRampToValueAtTime(0,qtAudioCtx.currentTime+1.5); n.o.stop(qtAudioCtx.currentTime+1.6); }catch(e){} });
+  qtDroneNodes=[];
+}
+function qtStopAllTimers(){ clearTimeout(qtBellTimer); clearTimeout(qtPadTimer); qtBellTimer=null; qtPadTimer=null; }
+
+function qtBuildMusic(){
+  qtAudioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  qtMasterGain=qtAudioCtx.createGain(); qtMasterGain.gain.value=0; qtMasterGain.connect(qtAudioCtx.destination);
+  qtMusicPlaying=true; qtMusicStarted=true;
+  qtMasterGain.gain.linearRampToValueAtTime(0.22,qtAudioCtx.currentTime+1.5);
+  qtStartDrone();
+  qtBellTimer=setTimeout(qtScheduleBell,1500);
+  qtPadTimer=setTimeout(qtSchedulePad,3000);
+  var mb=document.getElementById('home-music-btn'); if(mb){ mb.textContent='🔊'; }
+}
+
+function qtStopMusic(){
+  if(!qtMusicStarted) return;
+  qtMusicPlaying=false; qtStopAllTimers(); qtStopDrone();
+  if(qtMasterGain) qtMasterGain.gain.linearRampToValueAtTime(0,qtAudioCtx.currentTime+1.2);
+}
+
+function qtToggleMusic(){
+  var btn=document.getElementById('home-music-btn');
+  if(!qtMusicStarted){ qtBuildMusic(); return; }
+  if(qtMusicPlaying){
+    qtMusicPlaying=false; qtStopAllTimers(); qtStopDrone();
+    qtMasterGain.gain.linearRampToValueAtTime(0,qtAudioCtx.currentTime+1.2);
+    if(btn){ btn.textContent='🔇'; btn.style.opacity='0.5'; }
+  } else {
+    qtMusicPlaying=true; qtMasterGain.gain.linearRampToValueAtTime(0.22,qtAudioCtx.currentTime+0.8);
+    qtStartDrone(); qtBellTimer=setTimeout(qtScheduleBell,800); qtPadTimer=setTimeout(qtSchedulePad,2000);
+    if(btn){ btn.textContent='🔊'; btn.style.opacity='1'; }
+  }
+}
+
+/* ── 홈으로 갈 때 음악 정지 ── */
+function goHome() {
+  go('home');
+}
+
+/* ══════════════════════════════
+   오늘의 운세 - 원형 휠 + 나비 + 카드
+══════════════════════════════ */
+var dfSelectedCat = '';
+var dfSelectedCard = null;
+var dfBflies = [];
+var dfAnimating = false;
+var dfBflyCvs = null, dfBflyCtx = null;
+var dfBflyFlying = false; /* false=정지, true=날아다님 */
+var dfResultsHistory = []; /* 누적 기록 */
+
+/* 오늘의 운세도 78장 전체 사용 */
+var DF_TAROT = QT_DECK;
+
+function dfOpen() {
+  playDrop();
+  dfSelectedCat = ''; dfSelectedCard = null; dfBflyFlying = false;
+  dfResultsHistory = [];
+  dfUsedIdx = [];
+  document.querySelectorAll('.df-cat-label').forEach(function(b){ b.classList.remove('selected'); });
+  document.getElementById('df-cards-row').style.display = 'none';
+  document.getElementById('df-cards-row').innerHTML = '';
+  var latestDiv = document.getElementById('df-latest-result');
+  if (latestDiv) latestDiv.innerHTML = '';
+  var summaryBtn = document.getElementById('df-summary-btn');
+  if (summaryBtn) summaryBtn.style.display = 'none';
+  document.getElementById('df-circle-text').innerHTML = '카테고리를<br>선택하세요';
+  document.getElementById('df-modal').style.display = 'flex';
+
+  /* 스크롤 시 나비 원 위치로 복귀 */
+  var wrap = document.getElementById('df-scroll-wrap');
+  if (wrap) {
+    wrap.scrollTop = 0;
+    wrap.onscroll = function() {
+      if (wrap.scrollTop > 20 && dfBflies && dfBflies[0]) {
+        dfBflyFlying = false;
+        dfBflies[0].onButton = false;
+        dfBflies[0].wingSpeed = 0.05;
+        dfBflies[0].vx = 0; dfBflies[0].vy = 0;
+        dfBflies[0].x = dfBflies[0].restX;
+        dfBflies[0].y = dfBflies[0].restY;
+      }
+    };
+  }
+
+  setTimeout(function(){ dfInitButterflies(); }, 80);
+}
+
+function dfClose() {
+  document.getElementById('df-modal').style.display = 'none';
+  dfAnimating = false;
+}
+
+function dfReset() {
+  dfSelectedCat = ''; dfSelectedCard = null;
+  document.querySelectorAll('.df-cat-label').forEach(function(b){ b.classList.remove('selected'); });
+  document.getElementById('df-cards-row').style.display = 'none';
+  document.getElementById('df-cards-row').innerHTML = '';
+  document.getElementById('df-circle-text').innerHTML = '카테고리를<br>선택하세요';
+}
+
+function dfInitButterflies() {
+  dfBflyCvs = document.getElementById('df-bfly-canvas');
+  if (!dfBflyCvs) return;
+  var modal = document.getElementById('df-modal');
+  dfBflyCvs.width = modal.offsetWidth;
+  dfBflyCvs.height = modal.offsetHeight;
+  dfBflyCtx = dfBflyCvs.getContext('2d');
+  var markBox = document.getElementById('df-mark-box');
+  var modalRect = modal.getBoundingClientRect();
+  var markRect = markBox ? markBox.getBoundingClientRect() : null;
+  var cx = markRect ? markRect.left - modalRect.left + markRect.width*0.50 : dfBflyCvs.width/2;
+  var cy = markRect ? markRect.top - modalRect.top + markRect.height*0.40 : dfBflyCvs.height*0.40; /* 원 중앙 살짝 위 */
+  dfBflies = [{
+    x:cx, y:cy, vx:0, vy:0,
+    phase:0, wingSpeed:0.05, size:20, alpha:0.92, hue:270,
+    target:null, restX:cx, restY:cy, restPhase:0, onButton:false
+  }];
+  dfAnimating = true; dfBflyFlying = false;
+  dfBflyLoop();
+}
+
+function dfBflyLoop() {
+  if (!dfAnimating || !dfBflyCtx) return;
+  dfBflyCtx.clearRect(0,0,dfBflyCvs.width,dfBflyCvs.height);
+  dfBflies.forEach(function(b) {
+    b.phase += b.wingSpeed; b.restPhase += 0.014;
+    if (!dfBflyFlying) {
+      b.x = b.restX + Math.sin(b.restPhase)*3;
+      b.y = b.restY + Math.cos(b.restPhase*0.8)*2.5;
+    } else if (b.target && !b.onButton) {
+      var dx=b.target.x-b.x, dy=b.target.y-b.y;
+      var dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist>6){
+        b.vx+=dx/dist*0.6; b.vy+=dy/dist*0.5;
+        b.vx*=0.86; b.vy*=0.86;
+        b.x+=b.vx; b.y+=b.vy; b.wingSpeed=0.13;
+      } else {
+        b.x=b.target.x; b.y=b.target.y;
+        b.vx=0; b.vy=0; b.onButton=true; b.wingSpeed=0.025;
+      }
+    }
+    dfDrawBfly(dfBflyCtx,b.x,b.y,b.size,b.phase,b.alpha,b.hue,!dfBflyFlying||b.onButton);
+  });
+  requestAnimationFrame(dfBflyLoop);
+}
+
+function dfDrawBfly(ctx,x,y,size,phase,alpha,hue,resting) {
+  var wing = resting ? (0.55+Math.abs(Math.sin(phase*0.3))*0.2) : Math.abs(Math.sin(phase));
+  ctx.save(); ctx.globalAlpha=alpha; ctx.translate(x,y);
+  var g1=ctx.createRadialGradient(-size*wing*0.5,-size*0.3,0,-size*wing*0.5,-size*0.3,size*0.9);
+  g1.addColorStop(0,'hsla('+(hue+10)+',90%,85%,0.95)');
+  g1.addColorStop(0.5,'hsla('+hue+',80%,70%,0.85)');
+  g1.addColorStop(1,'hsla('+(hue-10)+',70%,55%,0.6)');
+  ctx.beginPath(); ctx.ellipse(-size*wing*0.85,-size*0.45,size*wing*0.9,size*0.72,-0.35,0,Math.PI*2);
+  ctx.fillStyle=g1; ctx.fill();
+  var g2=ctx.createRadialGradient(size*wing*0.5,-size*0.3,0,size*wing*0.5,-size*0.3,size*0.9);
+  g2.addColorStop(0,'hsla('+(hue+10)+',90%,85%,0.95)');
+  g2.addColorStop(0.5,'hsla('+hue+',80%,70%,0.85)');
+  g2.addColorStop(1,'hsla('+(hue-10)+',70%,55%,0.6)');
+  ctx.beginPath(); ctx.ellipse(size*wing*0.85,-size*0.45,size*wing*0.9,size*0.72,0.35,0,Math.PI*2);
+  ctx.fillStyle=g2; ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-size*wing*0.65,size*0.32,size*wing*0.6,size*0.42,0.25,0,Math.PI*2);
+  ctx.fillStyle='hsla('+(hue+20)+',75%,72%,0.75)'; ctx.fill();
+  ctx.beginPath(); ctx.ellipse(size*wing*0.65,size*0.32,size*wing*0.6,size*0.42,-0.25,0,Math.PI*2);
+  ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0,0,1.5,size*0.55,0,0,Math.PI*2);
+  ctx.fillStyle='hsla('+hue+',40%,25%,0.95)'; ctx.fill();
+  ctx.strokeStyle='hsla('+hue+',60%,70%,0.7)'; ctx.lineWidth=0.8;
+  ctx.beginPath(); ctx.moveTo(0,-size*0.4); ctx.quadraticCurveTo(-size*0.3,-size*0.9,-size*0.5,-size*1.0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,-size*0.4); ctx.quadraticCurveTo(size*0.3,-size*0.9,size*0.5,-size*1.0); ctx.stroke();
+  ctx.beginPath(); ctx.arc(-size*0.5,-size*1.0,1.2,0,Math.PI*2);
+  ctx.fillStyle='hsla('+hue+',80%,80%,0.9)'; ctx.fill();
+  ctx.beginPath(); ctx.arc(size*0.5,-size*1.0,1.2,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function dfSelectCat(el, cat) {
+  dfSelectedCat = cat; dfSelectedCard = null;
+  document.querySelectorAll('.df-cat-label').forEach(function(b){ b.classList.remove('selected'); });
+  el.classList.add('selected');
+  document.getElementById('df-cards-row').style.display = 'none';
+  document.getElementById('df-cards-row').innerHTML = '';
+  document.getElementById('df-circle-text').innerHTML =
+    '<span style="color:#d4b0ff;font-size:12px;">'+cat+'</span><br><span style="color:#7a5fa0;font-size:10px;">카드를 뽑으세요</span>';
+  var btn=document.getElementById('df-draw-btn');
+  var btnRect=btn.getBoundingClientRect();
+  var modalRect=document.getElementById('df-modal').getBoundingClientRect();
+  var tx=btnRect.left-modalRect.left+btnRect.width/2;
+  var ty=btnRect.top-modalRect.top-16;
+  dfBflyFlying=true; dfBflies[0].onButton=false; dfBflies[0].wingSpeed=0.13;
+  dfBflies[0].target={x:tx,y:ty};
+}
+
+/* Fisher-Yates 셔플 */
+function dfFisherYates(arr) {
+  var a = arr.slice();
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+  }
+  return a;
+}
+
+/* 세션 내 뽑힌 카드 추적 */
+var dfUsedIdx = [];
+
+function dfDrawCards() {
+  if (!dfSelectedCat) { alert('카테고리를 먼저 선택하세요!'); return; }
+
+  /* 22장 다 썼으면 리셋 */
+  if (dfUsedIdx.length >= DF_TAROT.length) { dfUsedIdx = []; }
+
+  /* 아직 안 뽑힌 인덱스만 모아 셔플 후 3장 선택 */
+  var avail = [];
+  for (var i = 0; i < DF_TAROT.length; i++) {
+    if (dfUsedIdx.indexOf(i) === -1) avail.push(i);
+  }
+  avail = dfFisherYates(avail);
+  var picked = avail.slice(0, 3);
+  picked.forEach(function(idx){ dfUsedIdx.push(idx); });
+  var pool = picked.map(function(idx){ return DF_TAROT[idx]; });
+
+  var row = document.getElementById('df-cards-row');
+  row.innerHTML = ''; row.style.display = 'flex';
+  row.style.justifyContent = 'center';
+  row.style.gap = '12px';
+  row.style.padding = '10px 0';
+
+  pool.forEach(function(card) {
+    var container = document.createElement('div');
+    container.style.cssText = 'width:76px;height:118px;perspective:600px;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;';
+    var inner = document.createElement('div');
+    inner.style.cssText = 'width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform 0.55s ease;';
+    var back = document.createElement('div');
+    back.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:8px;border:2px solid rgba(160,80,255,0.6);background:radial-gradient(ellipse at 30% 30%,#2a0050,#0d0020);display:flex;align-items:center;justify-content:center;';
+    var star = document.createElement('div');
+    star.style.cssText = 'color:rgba(180,100,255,0.6);font-size:24px;'; star.textContent = '✦';
+    back.appendChild(star);
+    var front = document.createElement('div');
+    front.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;transform:rotateY(180deg);border-radius:8px;border:2px solid rgba(180,100,255,0.8);overflow:hidden;background:#0d0020;';
+    var img = document.createElement('img');
+    img.src = card.img; img.alt = card.name;
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 0.3s;';
+    img.onload = function(){ img.style.opacity=1; };
+    front.appendChild(img);
+    inner.appendChild(back); inner.appendChild(front); container.appendChild(inner);
+
+    var flipped = false;
+    container.onclick = function() {
+      if (flipped) return;
+      /* 다른 카드 클릭 막기 */
+      row.querySelectorAll('div').forEach(function(c){ c.style.pointerEvents='none'; });
+      flipped = true;
+      inner.style.transform = 'rotateY(180deg)';
+      inner.style.boxShadow = '0 0 22px rgba(180,80,255,0.9)';
+      dfPickCard(card);
+    };
+    row.appendChild(container);
+  });
+}
+
+/* 카드 선택 → 원 안 결과 + 누적 리스트 */
+async function dfPickCard(card) {
+  var savedCat = dfSelectedCat;
+  document.getElementById('df-circle-text').innerHTML =
+    '<div style="color:#9b6fc7;font-size:9px;margin-top:6px;">읽는 중...</div>';
+
+  var prompt = '당신은 따뜻한 타로 점술사입니다. ' + savedCat + ' 분야에서 ' + card.name + ' 카드가 뽑혔습니다. 오늘의 운세를 다정하고 희망적인 한국어로 35자 이내 한 문장으로만 알려주세요.';
+  var text = '';
+  try {
+    var res = await fetch('https://silent-resonance-eb9f.xrhtmxm.workers.dev/api/tarot', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({prompt: prompt})
+    });
+    if (!res.ok) throw new Error('error');
+    var data = await res.json();
+    var cands = data.candidates || [];
+    text = cands.length && cands[0].content
+      ? cands[0].content.parts.map(function(p){return p.text||'';}).join('').trim()
+      : (data.content && data.content[0] ? data.content[0].text : '');
+    text = text.replace(/```/g,'').replace(/\n/g,' ').trim();
+    if (!text) text = '오늘 좋은 기운이 함께해요.';
+  } catch(e) {
+    text = '별들이 잠시 길을 잃었어요.';
+  }
+
+  /* 원 안에 결과 표시 */
+  document.getElementById('df-circle-text').innerHTML =
+    '<div style="color:#d4b0ff;font-size:10px;margin-bottom:2px;">' + savedCat + '</div>' +
+    '<div style="color:#ffea7a;font-size:9px;margin-bottom:2px;">✦ ' + card.name + ' ✦</div>' +
+    '<div style="color:#e8d0ff;font-size:9px;line-height:1.6;">' + text + '</div>';
+
+  /* 누적 기록 배열에 저장 */
+  dfResultsHistory.push({ cat: savedCat, card: card, text: text });
+
+  /* localStorage에 날짜별 누적 저장 */
+  msSaveTodayResult({ cat: savedCat, card: { name: card.name, img: card.img }, text: text });
+
+  /* 최신 결과 1개만 표시 */
+  var latestDiv = document.getElementById('df-latest-result');
+  if (latestDiv) {
+    var item = document.createElement('div');
+    item.style.cssText = 'background:rgba(80,0,160,0.25);border:1px solid rgba(160,80,255,0.4);border-radius:12px;padding:10px 12px;display:flex;gap:10px;align-items:center;';
+    var thumb = document.createElement('div');
+    thumb.style.cssText = 'width:42px;height:64px;border:1.5px solid rgba(160,80,255,0.5);border-radius:6px;overflow:hidden;flex-shrink:0;background:#0d0020;';
+    var timg = document.createElement('img');
+    timg.src = card.img;
+    timg.style.cssText = 'width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 0.3s;';
+    timg.onload = function(){ timg.style.opacity = 1; };
+    thumb.appendChild(timg);
+    var body = document.createElement('div');
+    body.style.cssText = 'flex:1;';
+    body.innerHTML =
+      '<div style="color:#d4b0ff;font-size:11px;font-weight:bold;margin-bottom:3px;">' + savedCat + ' · ' + card.name + '</div>' +
+      '<div style="color:#e8d0ff;font-size:11px;line-height:1.7;">' + text + '</div>';
+    item.appendChild(thumb);
+    item.appendChild(body);
+    latestDiv.innerHTML = '';
+    latestDiv.appendChild(item);
+  }
+
+  /* 종합운세 버튼 표시 (2개 이상 쌓이면) */
+  var summaryBtn = document.getElementById('df-summary-btn');
+  if (summaryBtn && dfResultsHistory.length >= 2) {
+    summaryBtn.style.display = 'block';
+  }
+
+  /* 나비 원 위치로 복귀 */
+  dfBflyFlying = false;
+  if (dfBflies && dfBflies[0]) {
+    dfBflies[0].target = null;
+    dfBflies[0].onButton = false;
+    dfBflies[0].wingSpeed = 0.05;
+    dfBflies[0].vx = 0; dfBflies[0].vy = 0;
+    dfBflies[0].x = dfBflies[0].restX;
+    dfBflies[0].y = dfBflies[0].restY;
+  }
+
+  /* 3초 후 카드 숨기고 다시 선택 가능 */
+  setTimeout(function(){
+    var row = document.getElementById('df-cards-row');
+    row.style.display = 'none';
+    row.innerHTML = '';
+    document.getElementById('df-circle-text').innerHTML =
+      '<span style="color:#d4b0ff;font-size:12px;">' + savedCat + '</span><br>' +
+      '<span style="color:#7a5fa0;font-size:10px;">다시 뽑을 수 있어요</span>';
+  }, 3000);
+}
+
+
+function dfOpenSummary() {
+  var list = document.getElementById('df-summary-list');
+  list.innerHTML = '';
+  dfResultsHistory.forEach(function(r, idx) {
+    var item = document.createElement('div');
+    item.style.cssText = 'background:rgba(80,0,160,0.25);border:1px solid rgba(160,80,255,0.35);border-radius:12px;padding:10px 12px;display:flex;gap:10px;align-items:center;';
+    var num = document.createElement('div');
+    num.style.cssText = 'width:22px;height:22px;border-radius:50%;background:rgba(160,80,255,0.4);color:#d4b0ff;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:bold;';
+    num.textContent = idx + 1;
+    var thumb = document.createElement('div');
+    thumb.style.cssText = 'width:38px;height:58px;border:1.5px solid rgba(160,80,255,0.5);border-radius:6px;overflow:hidden;flex-shrink:0;background:#0d0020;';
+    var timg = document.createElement('img');
+    timg.src = r.card.img;
+    timg.style.cssText = 'width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 0.3s;';
+    timg.onload = function(){ timg.style.opacity = 1; };
+    thumb.appendChild(timg);
+    var body = document.createElement('div');
+    body.style.cssText = 'flex:1;';
+    body.innerHTML =
+      '<div style="color:#d4b0ff;font-size:11px;font-weight:bold;margin-bottom:3px;">' + r.cat + ' · ' + r.card.name + '</div>' +
+      '<div style="color:#e8d0ff;font-size:11px;line-height:1.7;">' + r.text + '</div>';
+    item.appendChild(num);
+    item.appendChild(thumb);
+    item.appendChild(body);
+    list.appendChild(item);
+  });
+  document.getElementById('df-summary-modal').style.display = 'flex';
+}
+
+function dfCloseSummary() {
+  document.getElementById('df-summary-modal').style.display = 'none';
+}
+
+function dfAfterResult() {
+  dfSelectedCat = ''; dfSelectedCard = null;
+  document.querySelectorAll('.df-cat-label').forEach(function(b){ b.classList.remove('selected'); });
+  document.getElementById('df-cards-row').style.display = 'none';
+  document.getElementById('df-cards-row').innerHTML = '';
+  document.getElementById('df-circle-text').innerHTML = '카테고리를<br>선택하세요';
+  /* 나비 원 위치로 복귀 */
+  dfBflyFlying = false;
+  if (dfBflies && dfBflies[0]) {
+    dfBflies[0].target = null;
+    dfBflies[0].onButton = false;
+    dfBflies[0].wingSpeed = 0.05;
+    dfBflies[0].vx = 0; dfBflies[0].vy = 0;
+    dfBflies[0].x = dfBflies[0].restX;
+    dfBflies[0].y = dfBflies[0].restY;
+  }
+}
+
+</script>
+
+<!-- ══ 나만의 공간 모달 ══ -->
+<div id="myspace-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(2,0,8,0.93);z-index:9000;justify-content:center;align-items:center;">
+
+  <div style="width:88%;max-width:390px;max-height:91vh;display:flex;flex-direction:column;position:relative;">
+
+    <!-- 본체 카드 -->
+    <div style="display:flex;flex-direction:column;border-radius:8px;overflow:hidden;flex:1;min-height:0;background:linear-gradient(160deg,#fff9ee 0%,#fdf0d5 100%);box-shadow:0 24px 70px rgba(0,0,0,0.9);">
+
+      <!-- 헤더 -->
+      <div style="flex-shrink:0;background:linear-gradient(135deg,#c8962a,#e8cc5a,#c8962a);padding:14px 16px 12px;position:relative;text-align:center;">
+        <button onclick="closeMySpace()" style="position:absolute;top:10px;right:12px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.4);color:#fff;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;z-index:10;">✕</button>
+        <button onclick="closeMySpace();go('home');" style="position:absolute;top:10px;left:12px;padding:4px 10px;border-radius:12px;background:rgba(0,0,0,0.15);border:1px solid rgba(255,255,255,0.35);color:#fff;font-size:11px;font-family:'Noto Serif KR',serif;cursor:pointer;-webkit-tap-highlight-color:transparent;z-index:10;">🏠 홈</button>
+        <div style="font-size:20px;margin-bottom:4px;">🔮</div>
+        <div style="color:#2a1500;font-size:17px;font-family:'Noto Serif KR',serif;font-weight:bold;letter-spacing:3px;">나만의 공간</div>
+        <div id="myspace-date-line" style="color:#5a3000;font-size:11px;margin-top:3px;font-family:'Noto Serif KR',serif;"></div>
+        <div id="myspace-luck-color" style="display:none;margin-top:3px;font-size:12px;color:#3a1800;font-family:'Noto Serif KR',serif;"></div>
+      </div>
+
+      <!-- 탭 -->
+      <div style="flex-shrink:0;display:flex;background:#f5e4b0;border-bottom:1.5px solid rgba(180,140,60,0.4);">
+        <button id="ms-tab-today" onclick="switchMySpaceTab('today')" style="flex:1;padding:10px 0;background:transparent;border:none;border-bottom:2px solid #a07020;color:#5a3a00;font-size:11px;font-family:'Noto Serif KR',serif;cursor:pointer;font-weight:bold;-webkit-tap-highlight-color:transparent;">오늘의 운세</button>
+        <button id="ms-tab-week"  onclick="switchMySpaceTab('week')"  style="flex:1;padding:10px 0;background:transparent;border:none;border-bottom:2px solid transparent;color:#b09060;font-size:11px;font-family:'Noto Serif KR',serif;cursor:pointer;-webkit-tap-highlight-color:transparent;">일주일 운세</button>
+        <button id="ms-tab-memo"  onclick="switchMySpaceTab('memo')"  style="flex:1;padding:10px 0;background:transparent;border:none;border-bottom:2px solid transparent;color:#b09060;font-size:11px;font-family:'Noto Serif KR',serif;cursor:pointer;-webkit-tap-highlight-color:transparent;">별자리운세</button>
+      </div>
+
+      <!-- 내용 -->
+      <div id="ms-scroll" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;background:linear-gradient(160deg,#fff9ee 0%,#fdf0d5 100%);position:relative;">
+        <div style="padding:16px 18px 20px 18px;">
+
+          <!-- 오늘의 운세 탭 -->
+          <div id="ms-panel-today">
+            <div id="ms-today-empty" style="text-align:center;padding:24px 0;">
+              <div style="font-size:32px;margin-bottom:10px;">🔮</div>
+              <div style="color:#9a7830;font-size:12px;font-family:'Noto Serif KR',serif;line-height:2;">오늘의 운세에서 카테고리를 선택하고<br>카드를 뽑으면 여기에 기록돼요</div>
+            </div>
+            <div id="ms-today-content" style="display:none;">
+              <div style="color:#7a5020;font-size:10px;letter-spacing:2px;margin-bottom:10px;text-align:center;">— 오늘 뽑은 운세 —</div>
+              <div id="ms-today-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+            </div>
+          </div>
+
+          <!-- 일주일 운세 탭 -->
+          <div id="ms-panel-week" style="display:none;">
+            <div id="ms-week-empty" style="text-align:center;padding:24px 0;">
+              <div style="font-size:32px;margin-bottom:10px;">🌸</div>
+              <div style="color:#9a7830;font-size:12px;font-family:'Noto Serif KR',serif;line-height:2;">오늘의 운세를 뽑으면<br>이번 주 운세를 꽃으로 볼 수 있어요</div>
+            </div>
+            <div id="ms-week-content" style="display:none;">
+              <div style="color:#7a5020;font-size:10px;letter-spacing:2px;margin-bottom:12px;text-align:center;">— 이번 주 운세 —</div>
+              <div id="ms-week-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+              <div style="color:#9a7830;font-size:10px;margin-top:14px;text-align:center;line-height:2;">🌸🌸🌸🌸🌸 아주 좋아요 · 🌸🌸🌸 보통이에요 · 🌸 조심하세요</div>
+            </div>
+          </div>
+
+          <!-- 별자리운세 탭 -->
+          <div id="ms-panel-memo" style="display:none;">
+            <div style="color:#7a5020;font-size:10px;letter-spacing:2px;margin-bottom:12px;text-align:center;">— 오늘의 별자리 운세 —</div>
+            <div id="ms-star-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
+              <button onclick="msSelectStar('양자리','♈','03.21–04.19')" class="ms-star-btn" data-sign="양자리" style="background:rgba(160,112,32,0.1);border:1px solid rgba(160,112,32,0.3);border-radius:10px;padding:9px 4px;cursor:pointer;font-family:'Noto Serif KR',serif;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;">
+                <span style="font-size:20px;">♈</span><span style="font-size:10px;color:#5a3a00;">양자리</span><span style="font-size:8px;color:#9a7830;">03.21–04.19</span>
+              </button>
+              <button onclick="msSelectStar('황소자리','♉','04.20–05.20')" class="ms-star-btn" data-sign="황소자리" style="background:rgba(160,112,32,0.1);border:1px solid rgba(160,112,32,0.3);border-radius:10px;padding:9px 4px;cursor:pointer;font-family:'Noto Serif KR',serif;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;">
+                <span style="font-size:20px;">♉</span><span style="font-size:10px;color:#5a3a00;">황소자리</span><span style="font-size:8px;color:#9a7830;">04.20–05.20</span>
+              </button>
+              <button onclick="msSelectStar('쌍둥이자리','♊','05.21–06.21')" class="ms-star-btn" data-sign="쌍둥이자리" style="background:rgba(160,112,32,0.1);border:1px solid rgba(160,112,32,0.3);border-radius:10px;padding:9px 4px;cursor:pointer;font-family:'Noto Serif KR',serif;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;">
+                <span style="font-size:20px;">♊</span><span style="font-size:10px;color:#5a3a00;">쌍둥이자리</span><span style="font-size:8px;color:#9a7830;">05.21–06.21</span>
+              </button>
+              <button onclick="msSelectStar('게자리','♋','06.22–07.22')" class="ms-star-btn" data-sign="게자리" style="background:rgba(160,112,32,0.1);border:1px solid rgba(160,112,32,0.3);border-radius:10px;padding:9px 4px;cursor:pointer;font-family:'Noto Serif KR',serif;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;">
+                <span style="font-size:20px;">♋</span><span style="font-size:10px;color:#5a3a00;">게자리</span><span style="font-size:8px;color:#9a7830;">06.22–07.22</span>
+              </button>
+              <button onclick="msSelectStar('사자자리','♌','07.23–08.22')" class="ms-star-btn" data-sign="사자자리" style="background:rgba(160,112,32,0.1);border:1px solid rgba(160,112,32,0.3);border-radius:10px;padding:9px 4px;cursor:pointer;font-family:'Noto Serif KR',serif;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;">
+                <span style="font-size:20px;">♌</span><span style="font-size:10px;color:#5a3a00;">사자자리</span><span style="font-size:8px;color:#9a7830;">07.23–08.22</span>
+              </button>
+              <button onclick="msSelectStar('처녀자리','♍','08.23–09.22')" class="ms-star-btn" data-sign="처녀자리" style="background:rgba(160,112,32,0.1);border:1px solid rgba(160,112,32,0.3);border-radius:10px;padding:9px 4px;cursor:pointer;font-family:'Noto Serif KR',serif;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;">
+                <span style="font-size:20px;">♍</span><span style="font-size:10px;color:#5a3a00;">처녀자리</span><span style="font-size:8px;color:#9a7830;">08.23–09.22</span>
+              </button>
+              <button onclick="msSelectStar('천칭자리','♎','09.23–10.22')" class="ms-star-btn" data-sign="천칭자리" style="background:rgba(160,112,32,0.1);border:1px solid rgba(160,112,32,0.3);border-radius:10px;padding:9px 4px;cursor:pointer;font-family:'Noto Serif KR',serif;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;">
+                <span style="font-size:20px;">♎</span><span style="font-size:10px;color:#5a3a00;">천칭자리</span><span style="font-size:8px;color:#9a7830;">09.23–10.22</span>
+              </button>
+              <button onclick="msSelectStar('전갈자리','♏','10.23–11.21')" class="ms-star-btn" data-sign="전갈자리" style="background:rgba(160,112,32,0.1);border:1px solid rgba(160,112,32,0.3);border-radius:10px;padding:9px 4px;cursor:pointer;font-family:'Noto Serif KR',serif;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;">
+                <span style="font-size:20px;">♏</span><span style="font-size:10px;color:#5a3a00;">전갈자리</span><span style="font-size:8px;color:#9a7830;">10.23–11.21</span>
+              </button>
+              <button onclick="msSelectStar('사수자리','♐','11.22–12.21')" class="ms-star-btn" data-sign="사수자리" style="background:rgba(160,112,32,0.1);border:1px solid rgba(160,112,32,0.3);border-radius:10px;padding:9px 4px;cursor:pointer;font-family:'Noto Serif KR',serif;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;">
+                <span style="font-size:20px;">♐</span><span style="font-size:10px;color:#5a3a00;">사수자리</span><span style="font-size:8px;color:#9a7830;">11.22–12.21</span>
+              </button>
+              <button onclick="msSelectStar('염소자리','♑','12.22–01.19')" class="ms-star-btn" data-sign="염소자리" style="background:rgba(160,112,32,0.1);border:1px solid rgba(160,112,32,0.3);border-radius:10px;padding:9px 4px;cursor:pointer;font-family:'Noto Serif KR',serif;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;">
+                <span style="font-size:20px;">♑</span><span style="font-size:10px;color:#5a3a00;">염소자리</span><span style="font-size:8px;color:#9a7830;">12.22–01.19</span>
+              </button>
+              <button onclick="msSelectStar('물병자리','♒','01.20–02.18')" class="ms-star-btn" data-sign="물병자리" style="background:rgba(160,112,32,0.1);border:1px solid rgba(160,112,32,0.3);border-radius:10px;padding:9px 4px;cursor:pointer;font-family:'Noto Serif KR',serif;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;">
+                <span style="font-size:20px;">♒</span><span style="font-size:10px;color:#5a3a00;">물병자리</span><span style="font-size:8px;color:#9a7830;">01.20–02.18</span>
+              </button>
+              <button onclick="msSelectStar('물고기자리','♓','02.19–03.20')" class="ms-star-btn" data-sign="물고기자리" style="background:rgba(160,112,32,0.1);border:1px solid rgba(160,112,32,0.3);border-radius:10px;padding:9px 4px;cursor:pointer;font-family:'Noto Serif KR',serif;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;">
+                <span style="font-size:20px;">♓</span><span style="font-size:10px;color:#5a3a00;">물고기자리</span><span style="font-size:8px;color:#9a7830;">02.19–03.20</span>
+              </button>
+            </div>
+            <div id="ms-star-result" style="display:none;">
+              <div id="ms-star-result-box" style="background:rgba(255,250,230,0.9);border:1px solid rgba(180,140,60,0.45);border-radius:10px;padding:14px 16px;">
+                <div id="ms-star-result-header" style="text-align:center;margin-bottom:10px;"></div>
+                <div id="ms-star-result-text" style="color:#3a2800;font-size:12px;line-height:2;font-family:'Noto Serif KR',serif;"></div>
+                <div id="ms-star-result-scores" style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:5px;"></div>
+              </div>
+              <button onclick="msResetStar()" style="display:block;width:100%;margin-top:10px;background:rgba(160,112,32,0.12);border:1px solid rgba(160,112,32,0.35);color:#5a3a00;padding:10px 0;border-radius:8px;font-size:12px;font-family:'Noto Serif KR',serif;cursor:pointer;-webkit-tap-highlight-color:transparent;letter-spacing:1px;">✦ 다른 별자리 보기</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 하단 -->
+      <div style="flex-shrink:0;padding:8px 0 12px;text-align:center;border-top:1px solid rgba(180,140,60,0.3);background:#f5e4b0;">
+        <div style="font-size:10px;letter-spacing:3px;color:#a07020;">✦ 빛의 타로 ✦</div>
+      </div>
+    </div>
+
+    <!-- 우표 -->
+    <div style="position:absolute;top:-14px;right:8px;width:44px;height:55px;background:linear-gradient(135deg,#f5e8c0,#e8d098);border:2px solid rgba(160,112,32,0.5);border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;box-shadow:2px 2px 8px rgba(0,0,0,0.4);z-index:25;">
+      <div style="font-size:18px;line-height:1;">🔮</div>
+      <div style="font-size:7px;color:#8b5e14;letter-spacing:0.5px;font-weight:bold;">TAROT</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══ 나만의 공간 JS ══ */
+var msSavedMemo = '';
+
+var MS_LUCKY_COLORS = [
+  {name:'로즈골드',hex:'#c9a0a0',emoji:'🌸'},{name:'딥퍼플',hex:'#7b2fbe',emoji:'💜'},
+  {name:'에메랄드',hex:'#2ecc71',emoji:'💚'},{name:'코발트블루',hex:'#2980b9',emoji:'💙'},
+  {name:'선셋오렌지',hex:'#e67e22',emoji:'🧡'},{name:'아이보리',hex:'#f5deb3',emoji:'🤍'},
+  {name:'라벤더',hex:'#b39ddb',emoji:'🪻'},{name:'골드',hex:'#d4af37',emoji:'💛'},
+  {name:'피치핑크',hex:'#ffb7c5',emoji:'🩷'},{name:'딥레드',hex:'#c0392b',emoji:'❤️'}
+];
+var MS_GOOD = ['태양','별','세계','연인','힘','여황제','황제','정의','절제'];
+var MS_BAD  = ['탑','악마','죽음','달','완즈5','검5','검9','검10','컵5','펜타클5'];
+
+function msGetScore(name) {
+  return MS_GOOD.indexOf(name) !== -1 ? 5 : MS_BAD.indexOf(name) !== -1 ? 1 : 3;
+}
+function msGetToday() {
+  var d = new Date(), days = ['일','월','화','수','목','금','토'];
+  return d.getFullYear() + '년 ' + (d.getMonth()+1) + '월 ' + d.getDate() + '일 (' + days[d.getDay()] + ')';
+}
+function msGetLuckyColor() {
+  var d = new Date();
+  var seed = d.getFullYear() * 10000 + (d.getMonth()+1) * 100 + d.getDate();
+  return MS_LUCKY_COLORS[seed % MS_LUCKY_COLORS.length];
+}
+
+function openMySpace() {
+  /* 날짜 */
+  var dl = document.getElementById('myspace-date-line');
+  if (dl) dl.textContent = msGetToday();
+  /* 행운색 */
+  var lc = msGetLuckyColor();
+  var lcEl = document.getElementById('myspace-luck-color');
+  if (lcEl) {
+    lcEl.style.display = 'block';
+    lcEl.innerHTML = lc.emoji + ' 오늘의 행운색 : <span style="font-weight:bold;color:' + lc.hex + ';">' + lc.name + '</span>';
+  }
+  /* 메모 localStorage에서 복원 - (노트탭 제거됨) */
+  switchMySpaceTab('today');
+  document.getElementById('myspace-modal').style.display = 'flex';
+}
+
+function closeMySpace() {
+  document.getElementById('myspace-modal').style.display = 'none';
+}
+
+function switchMySpaceTab(tab) {
+  ['today','week','memo'].forEach(function(t) {
+    var panel = document.getElementById('ms-panel-' + t);
+    var btn   = document.getElementById('ms-tab-' + t);
+    if (panel) panel.style.display = (t === tab ? 'block' : 'none');
+    if (btn) {
+      btn.style.color = (t === tab ? '#5a3a00' : '#b09060');
+      btn.style.fontWeight = (t === tab ? 'bold' : 'normal');
+      btn.style.borderBottom = (t === tab ? '2px solid #a07020' : '2px solid transparent');
+    }
+  });
+  if (tab === 'today') msRefreshToday();
+  if (tab === 'week')  msRefreshWeek();
+  if (tab === 'memo')  msResetStar && msResetStar();
+}
+
+/* ── localStorage 날짜별 저장/불러오기 ── */
+function msTodayKey() {
+  var d = new Date();
+  return 'tarot_' + d.getFullYear() + '_' + (d.getMonth()+1) + '_' + d.getDate();
+}
+function msDateLabel(key) {
+  var parts = key.replace('tarot_','').split('_');
+  return parts[1] + '/' + parts[2];
+}
+function msSaveTodayResult(item) {
+  try {
+    var key = msTodayKey();
+    var existing = JSON.parse(localStorage.getItem(key) || '[]');
+    existing.push(item);
+    localStorage.setItem(key, JSON.stringify(existing));
+    /* 8일 이상 된 데이터 자동 삭제 */
+    var cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7);
+    Object.keys(localStorage).forEach(function(k) {
+      if (k.indexOf('tarot_') === 0) {
+        var parts = k.replace('tarot_','').split('_');
+        var d = new Date(parts[0], parts[1]-1, parts[2]);
+        if (d < cutoff) localStorage.removeItem(k);
+      }
+    });
+  } catch(e) {}
+}
+function msLoadWeekData() {
+  var result = [];
+  try {
+    for (var i = 6; i >= 0; i--) {
+      var d = new Date(); d.setDate(d.getDate() - i);
+      var key = 'tarot_' + d.getFullYear() + '_' + (d.getMonth()+1) + '_' + d.getDate();
+      var items = JSON.parse(localStorage.getItem(key) || '[]');
+      if (items.length) result.push({ key: key, date: msDateLabel(key), items: items });
+    }
+  } catch(e) {}
+  return result;
+}
+
+function msRefreshToday() {
+  var hist = (typeof dfResultsHistory !== 'undefined') ? dfResultsHistory : [];
+  /* 오늘 localStorage에서도 불러오기 */
+  try {
+    var saved = JSON.parse(localStorage.getItem(msTodayKey()) || '[]');
+    saved.forEach(function(s) {
+      var already = hist.some(function(h){ return h.cat === s.cat && h.card.name === s.card.name; });
+      if (!already) hist.push(s);
+    });
+  } catch(e) {}
+  var emptyDiv   = document.getElementById('ms-today-empty');
+  var contentDiv = document.getElementById('ms-today-content');
+  var listDiv    = document.getElementById('ms-today-list');
+  if (!hist.length) {
+    if (emptyDiv)   emptyDiv.style.display   = 'block';
+    if (contentDiv) contentDiv.style.display = 'none';
+    return;
+  }
+  if (emptyDiv)   emptyDiv.style.display   = 'none';
+  if (contentDiv) contentDiv.style.display = 'block';
+  if (!listDiv) return;
+  listDiv.innerHTML = '';
+  hist.forEach(function(r) {
+    var score   = msGetScore(r.card.name);
+    var flowers = '🌸'.repeat(score) + '🌑'.repeat(5 - score);
+    var item = document.createElement('div');
+    item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed rgba(160,112,32,0.2);';
+    item.innerHTML =
+      '<div style="width:36px;height:55px;border:1.5px solid rgba(160,112,32,0.4);border-radius:5px;overflow:hidden;flex-shrink:0;">' +
+        '<img src="' + r.card.img + '" style="width:100%;height:100%;object-fit:cover;">' +
+      '</div>' +
+      '<div style="flex:1;">' +
+        '<div style="color:#5a3a00;font-size:12px;font-weight:bold;font-family:\'Noto Serif KR\',serif;">' + r.cat + ' · ' + r.card.name + '</div>' +
+        '<div style="font-size:13px;letter-spacing:1px;margin:2px 0;">' + flowers + '</div>' +
+        '<div style="color:#7a5020;font-size:11px;line-height:1.7;font-family:\'Noto Serif KR\',serif;">' + r.text + '</div>' +
+      '</div>';
+    listDiv.appendChild(item);
+  });
+}
+
+function msRefreshWeek() {
+  var weekData = msLoadWeekData();
+  var emptyDiv   = document.getElementById('ms-week-empty');
+  var contentDiv = document.getElementById('ms-week-content');
+  var listDiv    = document.getElementById('ms-week-list');
+  if (!weekData.length) {
+    if (emptyDiv)   emptyDiv.style.display   = 'block';
+    if (contentDiv) contentDiv.style.display = 'none';
+    return;
+  }
+  if (emptyDiv)   emptyDiv.style.display   = 'none';
+  if (contentDiv) contentDiv.style.display = 'block';
+  if (!listDiv) return;
+  listDiv.innerHTML = '';
+  weekData.forEach(function(day) {
+    /* 날짜 구분선 */
+    var dateRow = document.createElement('div');
+    dateRow.style.cssText = 'color:#9a7830;font-size:10px;letter-spacing:2px;margin:10px 0 4px;text-align:center;font-family:\'Noto Serif KR\',serif;';
+    dateRow.textContent = '— ' + day.date + ' —';
+    listDiv.appendChild(dateRow);
+    day.items.forEach(function(r) {
+      var score = msGetScore(r.card.name);
+      var flowers = '🌸'.repeat(score) + '🌑'.repeat(5 - score);
+      var label = score >= 4 ? '좋아요' : score === 3 ? '보통이에요' : '조심하세요';
+      var labelColor = score >= 4 ? '#6b8f3a' : score === 3 ? '#8b6914' : '#8b3a1a';
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:5px 0;';
+      row.innerHTML =
+        '<div style="width:52px;color:#5a3a00;font-size:11px;font-family:\'Noto Serif KR\',serif;font-weight:bold;flex-shrink:0;">' + r.cat + '</div>' +
+        '<div style="font-size:14px;letter-spacing:2px;flex:1;">' + flowers + '</div>' +
+        '<div style="font-size:10px;color:' + labelColor + ';font-family:\'Noto Serif KR\',serif;font-weight:bold;">' + label + '</div>';
+      listDiv.appendChild(row);
+    });
+  });
+}
+
+function saveMyMemo() {}
+
+/* ══ 별자리 운세 JS ══ */
+var msSelectedStar = null;
+
+function msSelectStar(name, symbol, period) {
+  // 버튼 선택 표시
+  document.querySelectorAll('.ms-star-btn').forEach(function(b) {
+    b.style.background = 'rgba(160,112,32,0.1)';
+    b.style.borderColor = 'rgba(160,112,32,0.3)';
+  });
+  var chosen = document.querySelector('.ms-star-btn[data-sign="' + name + '"]');
+  if (chosen) {
+    chosen.style.background = 'rgba(160,112,32,0.28)';
+    chosen.style.borderColor = 'rgba(160,112,32,0.75)';
+  }
+  msSelectedStar = name;
+  var resultEl = document.getElementById('ms-star-result');
+  var headerEl = document.getElementById('ms-star-result-header');
+  var textEl   = document.getElementById('ms-star-result-text');
+  var scoresEl = document.getElementById('ms-star-result-scores');
+  resultEl.style.display = 'block';
+  headerEl.innerHTML = '<span style="font-size:28px;">' + symbol + '</span>' +
+    '<div style="color:#5a3a00;font-size:14px;font-weight:bold;font-family:\'Noto Serif KR\',serif;margin-top:4px;">' + name + '</div>' +
+    '<div style="color:#9a7830;font-size:10px;">' + period + '</div>';
+  textEl.innerHTML = '<span style="color:#9a7830;font-size:11px;">✦ 별이 속삭이는 오늘의 이야기 ✦</span><br><span style="color:#b09060;font-size:11px;">잠시 기다려 주세요...</span>';
+  scoresEl.innerHTML = '';
+  // 날짜 시드 기반 운세 생성
+  var d = new Date();
+  var seed = (d.getFullYear() * 10000 + (d.getMonth()+1) * 100 + d.getDate()) * 100 + msStarIndex(name);
+  var fortune = msGenerateFortune(name, seed);
+  setTimeout(function() {
+    textEl.innerHTML = fortune.text;
+    scoresEl.innerHTML = fortune.scores;
+  }, 600);
+}
+
+function msStarIndex(name) {
+  var signs = ['양자리','황소자리','쌍둥이자리','게자리','사자자리','처녀자리','천칭자리','전갈자리','사수자리','염소자리','물병자리','물고기자리'];
+  return signs.indexOf(name);
+}
+
+function msGenerateFortune(name, seed) {
+  function rng(max) { seed = (seed * 1664525 + 1013904223) & 0x7fffffff; return seed % max; }
+  var overall   = 3 + rng(3);
+  var love      = 2 + rng(4);
+  var money     = 2 + rng(4);
+  var health    = 2 + rng(4);
+  var starStr   = function(v) { return '⭐'.repeat(v) + '☆'.repeat(5-v); };
+  var msgs = [
+    ['오늘은 새로운 인연이 문을 두드릴 듯한 하루예요. 마음을 열어두세요.','뜻밖의 소식이 기쁨을 가져다줄 수 있어요. 주변을 살펴보세요.','차분히 내면의 목소리에 귀를 기울이는 것이 중요한 날이에요.','작은 친절이 큰 행운을 불러오는 날이에요. 먼저 손 내밀어 보세요.','오래된 꿈이 다시 빛나기 시작할 날이에요. 포기하지 마세요.'],
+    ['조용한 사색이 답을 가져다줄 하루예요. 서두르지 마세요.','믿는 사람과 솔직한 대화를 나누면 마음이 가벼워질 거예요.','직감이 잘 맞는 날이에요. 첫 번째 느낌을 믿어보세요.','오늘 시작한 일이 좋은 결실로 이어질 가능성이 높아요.','평소보다 에너지가 넘치는 날이에요. 적극적으로 나서보세요.']
+  ];
+  var msgPool = msgs[rng(2)];
+  var mainMsg = msgPool[rng(msgPool.length)];
+  var loveWords  = ['연인과의 시간이 더욱 달콤하게 느껴질 거예요.','진심을 전하기 좋은 날이에요.','인연의 실이 조용히 이어지는 중이에요.','솔직한 마음이 상대방의 마음을 움직일 거예요.'];
+  var moneyWords = ['작은 절약이 큰 행운을 만들어요.','뜻밖의 수입이 생길 수 있어요.','지출은 신중하게, 기회는 놓치지 마세요.','재정 계획을 꼼꼼히 점검해 보세요.'];
+  var healthWords= ['가벼운 스트레칭으로 몸의 긴장을 풀어주세요.','충분한 수분과 휴식이 오늘의 에너지를 지켜줘요.','오늘은 몸이 보내는 신호에 귀를 기울여요.','산책 한 번으로 기분이 한층 밝아질 거예요.'];
+  var luckColor = msGetLuckyColor();
+  var text = mainMsg + '<br><br>' +
+    '💑 연애 : ' + loveWords[rng(loveWords.length)] + '<br>' +
+    '💰 금전 : ' + moneyWords[rng(moneyWords.length)] + '<br>' +
+    '🌿 건강 : ' + healthWords[rng(healthWords.length)] + '<br><br>' +
+    '🌈 행운의 색 : <span style="color:' + luckColor.hex + ';font-weight:bold;">' + luckColor.name + '</span>';
+  var scores =
+    '<div style="background:rgba(255,250,230,0.6);border-radius:6px;padding:5px 8px;">' +
+      '<div style="color:#7a5020;font-size:10px;margin-bottom:2px;">종합운</div>' +
+      '<div style="font-size:11px;letter-spacing:1px;">' + starStr(overall) + '</div>' +
+    '</div>' +
+    '<div style="background:rgba(255,250,230,0.6);border-radius:6px;padding:5px 8px;">' +
+      '<div style="color:#7a5020;font-size:10px;margin-bottom:2px;">💑 연애운</div>' +
+      '<div style="font-size:11px;letter-spacing:1px;">' + starStr(love) + '</div>' +
+    '</div>' +
+    '<div style="background:rgba(255,250,230,0.6);border-radius:6px;padding:5px 8px;">' +
+      '<div style="color:#7a5020;font-size:10px;margin-bottom:2px;">💰 금전운</div>' +
+      '<div style="font-size:11px;letter-spacing:1px;">' + starStr(money) + '</div>' +
+    '</div>' +
+    '<div style="background:rgba(255,250,230,0.6);border-radius:6px;padding:5px 8px;">' +
+      '<div style="color:#7a5020;font-size:10px;margin-bottom:2px;">🌿 건강운</div>' +
+      '<div style="font-size:11px;letter-spacing:1px;">' + starStr(health) + '</div>' +
+    '</div>';
+  return {text: text, scores: scores};
+}
+
+function msResetStar() {
+  document.getElementById('ms-star-result').style.display = 'none';
+  document.querySelectorAll('.ms-star-btn').forEach(function(b) {
+    b.style.background = 'rgba(160,112,32,0.1)';
+    b.style.borderColor = 'rgba(160,112,32,0.3)';
+  });
+  msSelectedStar = null;
+}
+</script>
+
+</body>
+</html>
